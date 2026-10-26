@@ -35,7 +35,7 @@ One rule defines it:
 | Threat alert | **Change alert**: new AI tool, new trusted folder, new MCP server, AI touching a sensitive folder, new schedule |
 | Quarantine | **Guard**: no-go zones enforced by the OS. Otherwise AIEye observes and the user decides |
 | Tamper protection | AIEye's own folder, policy and service are a no-go zone for AI processes |
-| Business console | Optional central console for organisations; locally a dashboard on the device |
+| Business console | Optional central console for organisations; locally a desktop app on the device |
 
 ## 5. What AIEye shows
 
@@ -86,12 +86,12 @@ Every fact carries one label:
             │                                                        │
  AI tools ──┤  Device agent  ── reads ──  configs, OS schedulers,    │
             │       │                     permissions, audit logs,  │
-            │       │                     Sysmon events             │
+            │       │                     ETW events                │
             │       ▼                                                │
             │  Local store (snapshots + events)                      │
             │       │                                                │
             │       ▼                                                │
-            │  Dashboard (web app on localhost)                      │
+            │  Desktop app (Tauri)                                   │
             └───────┬────────────────────────────────────────────────┘
                     │ optional
                     ▼
@@ -104,7 +104,7 @@ Every fact carries one label:
 | Device agent | Scans, watches, enforces Guard rules | Each computer, as a service |
 | Definitions | Knowledge of how to detect and read each AI tool | Data files, updated independently of the app |
 | Local store | Snapshots, events, diffs | Device |
-| Dashboard | Inventory, map, alerts, history | Web app served on `localhost` |
+| Desktop app | Inventory, map, alerts, history | Tauri app running as the signed-in user, with tray icon and notifications |
 | Log connectors | Pull execution logs from middlemen (Composio first) | Device agent or gateway host |
 | Gateway (optional) | Holds tokens, logs every cloud AI call, enforces cloud no-go zones | Always-on host: small VPS, Raspberry Pi with tunnel, or a company server |
 | Org console (optional) | Central view across devices for organisations | Server |
@@ -125,13 +125,15 @@ Every fact carries one label:
 | Config parsing | `serde` with `serde_json` and `toml` |
 | Local store | SQLite via `rusqlite` (bundled) |
 | File watching | `notify` |
-| Dashboard | `axum` on `127.0.0.1`; Svelte + Vite frontend embedded in the binary |
+| Desktop app | Tauri 2 with a Svelte + Vite (TypeScript) frontend; opens no network port |
 | CLI and logging | `clap`, `tracing` |
 | Signed definitions | Ed25519 (`ed25519-dalek`) |
 | Gateway (v0.5) | `rmcp` (official Rust MCP SDK) on `axum` |
-| Windows installer | MSI via WiX (`cargo-wix`) |
+| Installers | Tauri bundler: MSI on Windows, DMG on macOS, DEB and AppImage on Linux |
 
 The v1.0 Windows minifilter driver is the exception: its language is decided when that work starts (§15).
+
+*Decided October 2026:* the dashboard is a **Tauri 2 desktop app**, not a web app on `localhost`. A localhost server can be called by every local process, including the AI tools AIEye watches; a Tauri app opens no port. It also gives a tray icon, native notifications for change alerts, and installers for all three platforms from one Svelte frontend, using the system's web engine (WebView2 on Windows, WebKit on macOS and Linux). In v0.1 the app calls the collectors directly. From v0.2 it talks to the service over a local channel (§13).
 
 ## 7. Definitions
 
@@ -223,7 +225,7 @@ The ETW rows replace Windows Security log event 4663 (needs an audit policy) and
 
 AIEye ends up holding the most sensitive view of the machine. It is read-only by default, local-first (nothing leaves the device unless the user enables it), unreachable by AI processes, and ships signed definitions.
 
-The local dashboard listens on `127.0.0.1` only, but AI processes on the same machine can reach that address too. It therefore requires a per-session token, and changing Guard policy requires administrator approval.
+The desktop app opens no network port, so AI processes cannot call it the way they could call a web server on `127.0.0.1`. From v0.2 it talks to the service over a local channel (a named pipe on Windows, a Unix socket elsewhere) on which the service checks which program is connecting, and changing Guard policy requires administrator approval.
 
 Config parsers read only the fields a definition lists and never store secret values: for MCP servers, AIEye keeps the server name, its command or the scheme, host and port of its URL, and the names of its environment variables, never their values, arguments, headers or tokens. Credentials, paths and queries are cut from URLs because hosted MCP servers often carry tokens there.
 
@@ -231,14 +233,14 @@ Config parsers read only the fields a definition lists and never store secret va
 
 | Version | Scope |
 |---|---|
-| **v0.1 Inventory** | Windows: detect AI tools from definitions; parse configs, trusted folders, MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; local dashboard |
+| **v0.1 Inventory** | Windows: detect AI tools from definitions; parse configs, trusted folders, MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app (Tauri) |
 | **v0.2 Live watch** | Windows service; ETW collector (process, file, DNS, network); per-process attribution following the process tree; recurring-pattern detection |
 | **v0.3 Guard v1** | Dedicated agent account with deny permissions; no-go policy file; blocked-attempt alerts; tool-settings deny rules |
 | **v0.4 Cloud logs** | Composio log connector; vendor-declared lists; declared-vs-observed alerts |
 | **v0.5 Gateway** | Self-hosted MCP gateway with logging and cloud no-go enforcement |
 | **v1.0** | Kernel-level Guard (Windows minifilter); macOS (Endpoint Security); Linux (fanotify); org console |
 
-v0.1 is built in slices: (1) tool detection from install paths and running processes, (2) configs: trusted folders and MCP servers, (3) store and diff, (4) schedulers, (5) dashboard. It runs as the signed-in user and installs nothing; the service arrives with ETW in v0.2, which needs it. Until then, AIEye's data folder (`%LOCALAPPDATA%\AIEye`) is reachable by AI tools running as the same user.
+v0.1 is built in slices: (1) tool detection from install paths and running processes, (2) configs: trusted folders and MCP servers, (3) store and diff, (4) desktop app, (5) schedulers. It runs as the signed-in user and installs nothing; the service arrives with ETW in v0.2, which needs it. Until then, AIEye's data folder (`%LOCALAPPDATA%\AIEye`) is reachable by AI tools running as the same user.
 
 ## 15. Open questions
 
