@@ -133,7 +133,6 @@ Rust in one Cargo workspace: the agent will run as SYSTEM and parse files that A
 | [`crates/aieye`](crates/aieye) | The `aieye` command |
 | [`definitions/`](definitions/) | AI tool definitions |
 | [`docs/concept.md`](docs/concept.md) | Vision, architecture, Guard design, limits, roadmap |
-| [`CLAUDE.md`](CLAUDE.md) | Principles and decisions, for working on AIEye with Claude Code |
 
 Before you open a pull request, run the same checks as CI:
 
