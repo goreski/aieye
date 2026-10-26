@@ -79,6 +79,18 @@ cargo run -p aieye -- history
 
 A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, and reads the user-level config files of known AI tools for their folders and MCP servers, keeping no secret values. AIEye's own data, a random device ID and the saved snapshots (`aieye.db`), lives in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else, or `scan --no-save` to skip saving.
 
+### Desktop app
+
+The app shows the latest scan, what changed since the one before, and each tool's processes, install traces, folders and MCP servers with their evidence labels. It shares its data with the command line and opens no network port. You also need Node.js 22 or later.
+
+```sh
+cd app
+npm install
+npm run tauri dev
+```
+
+`npm run tauri build -- --no-bundle` builds a standalone `target/release/aieye-app.exe` of about 12 MB. Without `--no-bundle` it also builds an installer, not yet signed.
+
 ## Teach AIEye a new AI tool
 
 AI tools change every month, so AIEye's knowledge of them lives in **definitions**: one TOML file per tool, updated without a new release, much like ad-block filter lists. If you use an AI tool, you can add it in a few minutes:
@@ -121,7 +133,7 @@ Definitions so far: Claude Code, Claude desktop, Codex CLI, GitHub Copilot CLI. 
 
 | Version | Scope | |
 |---|---|---|
-| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | Slices 1–3 of 5 done |
+| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | Slices 1–4 of 5 done |
 | v0.2 Live watch | Windows service; ETW collector for process, file, DNS and network events; attribution across the whole process tree; recurring-pattern detection | |
 | v0.3 Guard v1 | Dedicated agent account with deny permissions; no-go policy; alerts on blocked attempts | |
 | v0.4 Cloud logs | Composio execution logs; vendor-declared lists; alerts when declared and observed activity differ | |
@@ -132,7 +144,7 @@ The design, including the hard parts (child processes, cloud sync, AI tools driv
 
 ## Built with
 
-Rust in one Cargo workspace: the agent will run as SYSTEM and parse files that AI tools write, so memory safety matters. AIEye has its own collector rather than wrapping osquery or Sysmon. On Windows, live watch will read ETW directly, so no audit policy or third-party driver is needed.
+Rust in one Cargo workspace: the agent will run as SYSTEM and parse files that AI tools write, so memory safety matters. AIEye has its own collector rather than wrapping osquery or Sysmon. On Windows, live watch will read ETW directly, so no audit policy or third-party driver is needed. The desktop app is Tauri 2 with a Svelte frontend: it uses the system's web engine and opens no port, so AI processes on the machine cannot call it.
 
 | Path | Contents |
 |---|---|
@@ -141,12 +153,16 @@ Rust in one Cargo workspace: the agent will run as SYSTEM and parse files that A
 | [`crates/aieye-collect`](crates/aieye-collect) | Collectors that ask the OS for facts |
 | [`crates/aieye-store`](crates/aieye-store) | Saved snapshots (SQLite) and the device ID |
 | [`crates/aieye`](crates/aieye) | The `aieye` command |
+| [`app/`](app) | The desktop app: Svelte frontend, with the Tauri shell in `app/src-tauri` |
 | [`definitions/`](definitions/) | AI tool definitions |
 | [`docs/concept.md`](docs/concept.md) | Vision, architecture, Guard design, limits, roadmap |
 
-Before you open a pull request, run the same checks as CI:
+Before you open a pull request, run the same checks as CI. The app crate embeds `app/dist`, so build the frontend first:
 
 ```sh
+npm --prefix app ci
+npm --prefix app run check
+npm --prefix app run build
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace

@@ -1,0 +1,23 @@
+[package]
+name = "aieye-app"
+description = "AIEye's desktop app: what AI tools can reach on this device, and what changed"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+aieye-collect.workspace = true
+aieye-defs.workspace = true
+aieye-model.workspace = true
+aieye-store.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri.workspace = true
+tauri-plugin-dialog.workspace = true
+
+[lints]
+workspace = true

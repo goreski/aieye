@@ -12,7 +12,6 @@ aieye-model.workspace = true
 aieye-store.workspace = true
 anyhow.workspace = true
 clap.workspace = true
-dirs.workspace = true
 jiff.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

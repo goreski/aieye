@@ -3,7 +3,7 @@
 pub mod device;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use aieye_model::{DeviceId, Record, Snapshot};
@@ -14,6 +14,11 @@ use serde::Serialize;
 
 /// The database file in AIEye's data folder.
 pub const FILE_NAME: &str = "aieye.db";
+
+/// AIEye's data folder for the signed-in user: `AIEye` in the local app data folder.
+pub fn default_data_dir() -> Option<PathBuf> {
+    dirs::data_local_dir().map(|dir| dir.join("AIEye"))
+}
 
 /// Schema changes, applied in order. The database's `user_version` counts how many
 /// have run. Never edit one that has shipped; add a new one.

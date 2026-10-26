@@ -69,9 +69,8 @@ fn main() -> Result<()> {
 
     let data_dir = match cli.data_dir {
         Some(dir) => dir,
-        None => dirs::data_local_dir()
-            .context("cannot find the local app data folder; pass --data-dir")?
-            .join("AIEye"),
+        None => aieye_store::default_data_dir()
+            .context("cannot find the local app data folder; pass --data-dir")?,
     };
 
     match cli.command {

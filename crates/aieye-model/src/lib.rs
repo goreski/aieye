@@ -3,6 +3,7 @@
 //! Every fact AIEye records is a [`Record`]: what was observed ([`Fact`]), on which
 //! device, from which [`Source`], when, and how far it can be trusted ([`Evidence`]).
 
+mod describe;
 mod diff;
 
 pub use diff::{Change, ChangeKind, Diff, FactKey, Severity, diff};
