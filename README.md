@@ -4,6 +4,11 @@
 
 [![CI](https://github.com/goreski/aieye/actions/workflows/ci.yml/badge.svg)](https://github.com/goreski/aieye/actions/workflows/ci.yml)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.svg">
+  <img alt="AI tools act on files, processes, network, scheduled tasks and configs on your device, and the OS records it. AIEye reads only those records to watch AI tools and, later, guard no-go zones. What an AI tool says about itself is never evidence." src="docs/images/overview-light.svg">
+</picture>
+
 Your AI tools can read your folders, run scheduled tasks while you sleep and act on your mail, calendar and drive. AIEye shows what they can reach and what they actually did, and keeps them out of places they must never touch.
 
 It follows one rule:
