@@ -67,6 +67,8 @@ Each snapshot is compared with the previous one. Alerts for:
 - **Declared vs observed mismatch:** activity that matches no declared task; a declared task with no matching activity; activity from an app with no known access.
 - **Guard events:** every blocked attempt on a no-go zone.
 
+From v0.1, every scan is saved and `aieye diff` compares consecutive snapshots with fixed rules: a tool not in the older snapshot, and a configured folder or MCP server that was added or changed, are **alerts**; removals, install traces and running-process changes are **info**. Facts are matched by what they are about (tool and path, executable, config entry), not by process ID, and each change keeps the evidence label of its records.
+
 ### 5.6 History
 A timeline per AI tool, per folder and per account, exportable as CSV.
 

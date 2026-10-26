@@ -9,15 +9,14 @@ publish.workspace = true
 aieye-collect.workspace = true
 aieye-defs.workspace = true
 aieye-model.workspace = true
+aieye-store.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 dirs.workspace = true
+jiff.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
 
 [lints]
 workspace = true

@@ -3,6 +3,10 @@
 //! Every fact AIEye records is a [`Record`]: what was observed ([`Fact`]), on which
 //! device, from which [`Source`], when, and how far it can be trusted ([`Evidence`]).
 
+mod diff;
+
+pub use diff::{Change, ChangeKind, Diff, FactKey, Severity, diff};
+
 use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;

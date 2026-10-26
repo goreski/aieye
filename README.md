@@ -68,7 +68,16 @@ cd aieye
 cargo run -p aieye -- scan
 ```
 
-A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, and reads the user-level config files of known AI tools for their folders and MCP servers, keeping no secret values. AIEye's own data is just a random device ID in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else.
+Every scan is saved. After the next one, see what changed and list past scans:
+
+```sh
+cargo run -p aieye -- diff
+cargo run -p aieye -- history
+```
+
+`diff` marks a new AI tool, and a folder or MCP server that was added or changed, as an **alert**; everything else, such as a tool that stopped running, is **info**. Add `--json` for machine-readable output.
+
+A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, and reads the user-level config files of known AI tools for their folders and MCP servers, keeping no secret values. AIEye's own data, a random device ID and the saved snapshots (`aieye.db`), lives in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else, or `scan --no-save` to skip saving.
 
 ## Teach AIEye a new AI tool
 
@@ -112,7 +121,7 @@ Definitions so far: Claude Code, Claude desktop, Codex CLI, GitHub Copilot CLI. 
 
 | Version | Scope | |
 |---|---|---|
-| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | Slices 1–2 of 5 done |
+| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | Slices 1–3 of 5 done |
 | v0.2 Live watch | Windows service; ETW collector for process, file, DNS and network events; attribution across the whole process tree; recurring-pattern detection | |
 | v0.3 Guard v1 | Dedicated agent account with deny permissions; no-go policy; alerts on blocked attempts | |
 | v0.4 Cloud logs | Composio execution logs; vendor-declared lists; alerts when declared and observed activity differ | |
@@ -130,6 +139,7 @@ Rust in one Cargo workspace: the agent will run as SYSTEM and parse files that A
 | [`crates/aieye-model`](crates/aieye-model) | Records, evidence labels, snapshots |
 | [`crates/aieye-defs`](crates/aieye-defs) | Loads and validates definitions |
 | [`crates/aieye-collect`](crates/aieye-collect) | Collectors that ask the OS for facts |
+| [`crates/aieye-store`](crates/aieye-store) | Saved snapshots (SQLite) and the device ID |
 | [`crates/aieye`](crates/aieye) | The `aieye` command |
 | [`definitions/`](definitions/) | AI tool definitions |
 | [`docs/concept.md`](docs/concept.md) | Vision, architecture, Guard design, limits, roadmap |
@@ -145,7 +155,7 @@ cargo test --workspace
 ## Limits
 
 - Windows only for now. macOS and Linux come later.
-- Guard isn't built yet. v0.1 runs as you, so AI tools running as you can also reach AIEye's data folder.
+- Guard isn't built yet. v0.1 runs as you, so AI tools running as you can also reach AIEye's data folder, including its snapshot history.
 - AIEye watches AI tools. It is not built to resist an attacker deliberately hiding from it.
 - Phones are out of scope: iOS and Android don't let one app see what other apps do.
 
