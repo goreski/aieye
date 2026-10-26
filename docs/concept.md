@@ -135,7 +135,7 @@ The v1.0 Windows minifilter driver is the exception: its language is decided whe
 
 ## 7. Definitions
 
-AI tools change every month, so knowledge of how to recognise and read them lives in updatable data files, not in code. New tools are supported by shipping a new definition, not a new app version. Definitions could be open and community-maintained, like ad-block filter lists. See `definitions/README.md` for the format.
+AI tools change every month, so knowledge of how to recognise and read them lives in updatable data files, not in code. New tools are supported by shipping a new definition, not a new app version. Definitions could be open and community-maintained, like ad-block filter lists. They are TOML files; see `definitions/README.md` for the format.
 
 ## 8. Guard: no-go zones
 
@@ -222,20 +222,23 @@ AIEye ends up holding the most sensitive view of the machine. It is read-only by
 
 The local dashboard listens on `127.0.0.1` only, but AI processes on the same machine can reach that address too. It therefore requires a per-session token, and changing Guard policy requires administrator approval.
 
+Config parsers read only the fields a definition lists and never store secret values: for MCP servers, AIEye keeps the server name, its command or URL and the names of its environment variables, never their values, headers or tokens.
+
 ## 14. Roadmap
 
 | Version | Scope |
 |---|---|
 | **v0.1 Inventory** | Windows: detect AI tools from definitions; parse configs, trusted folders, MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; local dashboard |
-| **v0.2 Live watch** | ETW collector (process, file, DNS, network); per-process attribution following the process tree; recurring-pattern detection |
+| **v0.2 Live watch** | Windows service; ETW collector (process, file, DNS, network); per-process attribution following the process tree; recurring-pattern detection |
 | **v0.3 Guard v1** | Dedicated agent account with deny permissions; no-go policy file; blocked-attempt alerts; tool-settings deny rules |
 | **v0.4 Cloud logs** | Composio log connector; vendor-declared lists; declared-vs-observed alerts |
 | **v0.5 Gateway** | Self-hosted MCP gateway with logging and cloud no-go enforcement |
 | **v1.0** | Kernel-level Guard (Windows minifilter); macOS (Endpoint Security); Linux (fanotify); org console |
 
+v0.1 is built in slices: (1) tool detection from install paths and running processes, (2) configs: trusted folders and MCP servers, (3) store and diff, (4) schedulers, (5) dashboard. It runs as the signed-in user and installs nothing; the service arrives with ETW in v0.2, which needs it. Until then, AIEye's data folder (`%LOCALAPPDATA%\AIEye`) is reachable by AI tools running as the same user.
+
 ## 15. Open questions
 
-- Definitions format: keep YAML, or switch to TOML? Rust's YAML support weakened after `serde_yaml` was archived; TOML support is first-class.
 - Language for the v1.0 Windows minifilter: C, or Rust via `windows-drivers-rs`?
 - Where to host the gateway?
 - Open-source the definitions? Licence for the project?

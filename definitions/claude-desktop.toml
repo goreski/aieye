@@ -1,0 +1,16 @@
+# Claude, Anthropic's desktop app, installed as an MSIX package.
+id = "claude-desktop"
+name = "Claude"
+vendor = "Anthropic"
+kind = "desktop-app"
+platforms = ["windows", "macos"]
+
+[detect.windows]
+# A standard user cannot list WindowsApps, so this entry is found through running
+# processes only. `pzs8sxrjxfjjc` is the package's publisher ID.
+executables = ["%ProgramFiles%/WindowsApps/Claude_*__pzs8sxrjxfjjc/app/Claude.exe"]
+paths = ["%APPDATA%/Claude"]
+
+[verified.detect.windows]
+version = "3.6556.2.0"
+date = 2026-10-26

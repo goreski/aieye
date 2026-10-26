@@ -1,0 +1,14 @@
+# GitHub Copilot CLI.
+#
+# Not verified yet: both entries exist on the development machine, but the Copilot
+# CLI version there is not known.
+id = "copilot-cli"
+name = "GitHub Copilot CLI"
+vendor = "GitHub"
+kind = "cli"
+platforms = ["windows", "macos", "linux"]
+
+[detect.windows]
+# The launcher VS Code puts on PATH as `copilot`.
+executables = ["%LOCALAPPDATA%/Programs/Microsoft VS Code/bin/copilot-shim/copilot.exe"]
+paths = ["~/.copilot"]

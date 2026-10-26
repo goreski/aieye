@@ -1,0 +1,27 @@
+# Codex CLI, OpenAI's command-line coding agent.
+id = "codex-cli"
+name = "Codex CLI"
+vendor = "OpenAI"
+kind = "cli"
+platforms = ["windows", "macos", "linux"]
+
+[detect.windows]
+executables = [
+    # Standalone installer: the `codex` on PATH, a link into
+    # ~/.codex/packages/standalone. Windows reports a process started from it by the
+    # link's target, which the next entry matches.
+    "%LOCALAPPDATA%/Programs/OpenAI/Codex/bin/codex.exe",
+    # Versioned releases: `standalone` and `app-server-daemon`.
+    "~/.codex/packages/*/releases/*/bin/codex.exe",
+    # Another copy found running on the same install.
+    "%LOCALAPPDATA%/OpenAI/Codex/bin/*/codex.exe",
+]
+paths = [
+    "~/.codex",
+    # npm install. It runs under node.exe, so it is not yet detected as running.
+    "%APPDATA%/npm/codex.cmd",
+]
+
+[verified.detect.windows]
+version = "0.164.0"
+date = 2026-10-26

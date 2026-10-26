@@ -1,0 +1,22 @@
+[package]
+name = "aieye-collect"
+description = "AIEye's collectors: ask the OS what AI tools are present and running"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+aieye-defs.workspace = true
+aieye-model.workspace = true
+anyhow.workspace = true
+dirs.workspace = true
+glob.workspace = true
+jiff.workspace = true
+sysinfo.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

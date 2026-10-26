@@ -1,0 +1,22 @@
+# Claude Code, Anthropic's command-line coding agent.
+id = "claude-code"
+name = "Claude Code"
+vendor = "Anthropic"
+kind = "cli"
+platforms = ["windows", "macos", "linux"]
+
+[detect.windows]
+executables = [
+    # Native installer.
+    "~/.local/bin/claude.exe",
+    # An update renames the running binary, and sessions started before it keep
+    # running from the renamed file.
+    "~/.local/bin/claude.exe.old.*",
+    # The copy Claude desktop runs for its Code tab (seen with 2.1.308).
+    "%LOCALAPPDATA%/Claude-Data/claude_*/claude-code/*/*/claude.exe",
+]
+paths = ["~/.claude", "~/.claude.json"]
+
+[verified.detect.windows]
+version = "2.1.310"
+date = 2026-10-26
