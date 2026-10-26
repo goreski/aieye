@@ -109,7 +109,29 @@ Every fact carries one label:
 | Gateway (optional) | Holds tokens, logs every cloud AI call, enforces cloud no-go zones | Always-on host: small VPS, Raspberry Pi with tunnel, or a company server |
 | Org console (optional) | Central view across devices for organisations | Server |
 
-Building blocks to evaluate: osquery (cross-platform host queries) and Fleet (its web console), Sysinternals Sysmon and AccessChk on Windows.
+### 6.1 Stack
+
+*Decided October 2026.* AIEye writes its own collector rather than building on osquery and Sysmon, and the agent is written in **Rust**.
+
+- **Rust:** the agent runs as SYSTEM or root and parses files that AI tools write, so memory safety matters. Rust matches C++ for speed, and one Cargo workspace builds for Windows (x64 and ARM), macOS, Linux and a Raspberry Pi gateway.
+- **Own collector:** on Windows it reads ETW (Event Tracing for Windows) directly, so users need neither Sysmon nor an audit policy, and AIEye bundles no third-party tools.
+
+| Part | Choice |
+|---|---|
+| Language | Rust (stable), one Cargo workspace |
+| Async runtime | `tokio` |
+| Windows APIs | `windows` (Microsoft's Win32 bindings), `windows-service`, `ferrisetw` for ETW |
+| Linux and macOS (later) | `aya` (eBPF) and fanotify; `endpoint-sec` (Endpoint Security) |
+| Config parsing | `serde` with `serde_json` and `toml` |
+| Local store | SQLite via `rusqlite` (bundled) |
+| File watching | `notify` |
+| Dashboard | `axum` on `127.0.0.1`; Svelte + Vite frontend embedded in the binary |
+| CLI and logging | `clap`, `tracing` |
+| Signed definitions | Ed25519 (`ed25519-dalek`) |
+| Gateway (v0.5) | `rmcp` (official Rust MCP SDK) on `axum` |
+| Windows installer | MSI via WiX (`cargo-wix`) |
+
+The v1.0 Windows minifilter driver is the exception: its language is decided when that work starts (§15).
 
 ## 7. Definitions
 
@@ -167,14 +189,17 @@ An optional organisation module can add account-side evidence for managed domain
 | Copilot CLI `~/.copilot/config.json`, `trustedFolders` | Trusted folders | declared |
 | Claude Code `~/.claude.json` (`projects`), `~/.claude/settings.json` | Folders used, permissions, MCP servers | declared · to verify |
 | Claude desktop `AppData\Roaming\Claude\…\scheduled-tasks.json` | Local scheduled tasks and their working folders | declared · reported by users, to verify |
-| Windows Task Scheduler | OS scheduled jobs | verified |
-| NTFS permissions via AccessChk | Effective folder access per account | verified |
-| Windows Security log, event 4663 (needs auditing enabled) | File opens by process | verified |
-| Sysmon events 3 (network) and 22 (DNS) | Connections and lookups by process | verified |
+| Windows Task Scheduler (COM `ITaskService`) | OS scheduled jobs | verified |
+| NTFS permissions via the Windows Authz API | Effective folder access per account | verified |
+| ETW `Microsoft-Windows-Kernel-Process` | Process starts and stops with parent process (process tree) | verified · to verify |
+| ETW `Microsoft-Windows-Kernel-File` | File opens by process | verified · to verify |
+| ETW `Microsoft-Windows-DNS-Client`, `Microsoft-Windows-Kernel-Network` | DNS lookups and connections by process | verified · to verify |
 | Composio `POST /api/v3.1/logs/tool_execution` | Tool calls: time, status, tool, account | verified |
 | Google Admin SDK (org module, admin only) | OAuth tokens per user; API calls per app | verified |
 
 Note: in Gemini CLI and Codex, "trusted" controls whether project settings and tools load. It is not an access boundary.
+
+The ETW rows replace Windows Security log event 4663 (needs an audit policy) and Sysmon events 3 and 22 (needs a third-party install). Both stay available as fallbacks.
 
 ## 11. Limits
 
@@ -195,12 +220,14 @@ Note: in Gemini CLI and Codex, "trusted" controls whether project settings and t
 
 AIEye ends up holding the most sensitive view of the machine. It is read-only by default, local-first (nothing leaves the device unless the user enables it), unreachable by AI processes, and ships signed definitions.
 
+The local dashboard listens on `127.0.0.1` only, but AI processes on the same machine can reach that address too. It therefore requires a per-session token, and changing Guard policy requires administrator approval.
+
 ## 14. Roadmap
 
 | Version | Scope |
 |---|---|
 | **v0.1 Inventory** | Windows: detect AI tools from definitions; parse configs, trusted folders, MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; local dashboard |
-| **v0.2 Live watch** | Sysmon and file auditing; per-process attribution following the process tree; recurring-pattern detection |
+| **v0.2 Live watch** | ETW collector (process, file, DNS, network); per-process attribution following the process tree; recurring-pattern detection |
 | **v0.3 Guard v1** | Dedicated agent account with deny permissions; no-go policy file; blocked-attempt alerts; tool-settings deny rules |
 | **v0.4 Cloud logs** | Composio log connector; vendor-declared lists; declared-vs-observed alerts |
 | **v0.5 Gateway** | Self-hosted MCP gateway with logging and cloud no-go enforcement |
@@ -208,8 +235,8 @@ AIEye ends up holding the most sensitive view of the machine. It is read-only by
 
 ## 15. Open questions
 
-- Build on osquery and Sysmon, or write a dedicated collector?
-- Stack for the agent and the dashboard?
+- Definitions format: keep YAML, or switch to TOML? Rust's YAML support weakened after `serde_yaml` was archived; TOML support is first-class.
+- Language for the v1.0 Windows minifilter: C, or Rust via `windows-drivers-rs`?
 - Where to host the gateway?
 - Open-source the definitions? Licence for the project?
 - Name: "AIEye" has no conflict in AI monitoring, but an unrelated iOS app and a tool called "AI Bot Eye" exist. Check again before going public.
