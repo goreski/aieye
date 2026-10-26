@@ -1,0 +1,18 @@
+# Gemini, Google's desktop app. Its settings hold no folders or MCP servers.
+id = "gemini-desktop"
+name = "Gemini"
+vendor = "Google"
+kind = "desktop-app"
+platforms = ["windows"]
+
+[detect.windows]
+executables = [
+    "%LOCALAPPDATA%/Google/Gemini/app-*/Gemini.exe",
+    # Stays running in the background for the keyboard shortcut.
+    "%LOCALAPPDATA%/Google/Gemini/app-*/GeminiAppLauncher.exe",
+]
+paths = ["%LOCALAPPDATA%/Google/Gemini", "%APPDATA%/Gemini"]
+
+[verified.detect.windows]
+version = "1.16.0"
+date = 2026-10-26

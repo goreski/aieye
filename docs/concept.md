@@ -189,7 +189,9 @@ An optional organisation module can add account-side evidence for managed domain
 | Source | What it gives | Label |
 |---|---|---|
 | Codex `~/.codex/config.toml`, `[projects."<path>"] trust_level` | Trusted / untrusted project folders | declared |
-| Gemini CLI `~/.gemini/trustedFolders.json` | Trusted folder rules | declared |
+| Gemini CLI `~/.gemini/trustedFolders.json` | Trusted folder rules | declared · to verify; `~/.gemini` is shared with Antigravity |
+| Antigravity `~/.gemini/config/projects/*.json`: `projectResources.resources[].gitFolder.folderUri` | Folders each project works on, as file URIs | declared |
+| Antigravity `~/.gemini/config/mcp_config.json`, `mcpServers` | MCP servers | declared · to verify: empty on the dev machine |
 | Copilot CLI `~/.copilot/config.json` (JSON with `//` comments), `trustedFolders` | Trusted folders | declared · to verify: not set on the dev machine |
 | Claude Code `~/.claude.json`: `projects.<path>.hasTrustDialogAccepted` | Folders used and whether the user trusted them | declared |
 | Claude Code `~/.claude.json`: `mcpServers`, `projects.<path>.mcpServers` | MCP servers, user and per-project scope | declared · to verify: empty on the dev machine |

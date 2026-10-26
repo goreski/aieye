@@ -30,7 +30,7 @@ AIEye works like antivirus, with two parts:
 
 ## What a scan looks like
 
-On the development machine, one `aieye scan` finds 4 AI tools: 16 install traces and 23 AI processes running right now. Every finding is a record like this one:
+On the development machine, one `aieye scan` finds 6 AI tools: 25 install traces, 24 AI processes running right now, 11 folders and 2 MCP servers named in their configs. Every finding is a record like this one:
 
 ```json
 {
@@ -117,7 +117,7 @@ date = 2026-10-26
 
 Unknown fields are rejected, so a typo fails loudly instead of being ignored. The full format is in [`definitions/README.md`](definitions/README.md).
 
-Definitions so far: Claude Code, Claude desktop, Codex CLI, GitHub Copilot CLI. Not covered yet: Gemini CLI, Cursor, Windsurf, ChatGPT desktop, VS Code extensions (Copilot, Cline and others), Ollama, LM Studio, and the tools you use that we haven't heard of.
+Definitions so far: Antigravity (with `agy`), Claude Code, Claude desktop, Codex CLI, Gemini desktop, GitHub Copilot CLI. Not covered yet: Gemini CLI, Cursor, Windsurf, ChatGPT desktop, VS Code extensions (Copilot, Cline and others), Ollama, LM Studio, and the tools you use that we haven't heard of.
 
 ## Principles
 

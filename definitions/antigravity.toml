@@ -1,0 +1,44 @@
+# Google Antigravity, an agent-first IDE, with its `agy` command-line tool.
+id = "antigravity"
+name = "Antigravity"
+vendor = "Google"
+kind = "desktop-app"
+platforms = ["windows", "macos", "linux"]
+
+[detect.windows]
+# Not running during the check, so the paths Windows reports for its processes
+# were not seen yet; files and folders were.
+executables = [
+    "%LOCALAPPDATA%/Programs/Antigravity/Antigravity.exe",
+    "%LOCALAPPDATA%/agy/bin/agy.exe",
+]
+paths = [
+    "%APPDATA%/Antigravity",
+    # Antigravity keeps its agent data and config under ~/.gemini, which Gemini CLI
+    # also uses; neither folder here belongs to Gemini CLI.
+    "~/.gemini/antigravity",
+    "~/.gemini/config",
+]
+
+[[folders.windows]]
+# One file per project; each names the folders the project works on, as file URIs.
+file = "~/.gemini/config/projects/*.json"
+select = "projectResources.resources.*.gitFolder.folderUri"
+path = "value"
+# Not established whether Antigravity keeps its agent inside these folders, so
+# AIEye does not treat them as a boundary.
+boundary = false
+
+[[mcp.windows]]
+file = "~/.gemini/config/mcp_config.json"
+select = "mcpServers.*"
+
+[verified.detect.windows]
+version = "2.17.0"
+date = 2026-10-26
+
+[verified.folders.windows]
+version = "2.17.0"
+date = 2026-10-26
+
+# mcp is not verified: mcp_config.json is empty on the development machine.

@@ -130,8 +130,12 @@ fn read(file: &Path) -> Result<Value> {
 }
 
 /// Parses a JSON or TOML config. Errors give only a line number, never the text.
+/// An empty file has no entries; tools create some configs empty.
 fn parse(file: &Path, text: &str) -> Result<Value> {
     let text = text.trim_start_matches('\u{feff}');
+    if text.trim().is_empty() {
+        return Ok(Value::Null);
+    }
     if file
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
@@ -478,6 +482,15 @@ boundary = false
             let message = format!("{error:#}");
             assert!(message.contains("line"), "{message}");
             assert!(!message.contains("secret"), "{message}");
+        }
+    }
+
+    #[test]
+    fn empty_files_have_no_entries() {
+        for (name, text) in [("c.json", ""), ("c.toml", "  \n"), ("c.json", "\u{feff}\n")] {
+            let document = parse(Path::new(name), text).unwrap();
+            let selector = "mcpServers.*".parse().unwrap();
+            assert!(select(&document, &selector).is_empty(), "{name}");
         }
     }
 
