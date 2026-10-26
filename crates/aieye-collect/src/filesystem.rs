@@ -6,7 +6,7 @@ use aieye_model::{Evidence, Fact, Record};
 use anyhow::Result;
 use jiff::Timestamp;
 
-use crate::{Collector, Context, List, match_options};
+use crate::{Collector, Context};
 
 /// Reports every existing file or folder that matches a definition's `detect` entries.
 ///
@@ -21,37 +21,27 @@ impl Collector for Filesystem {
 
     fn collect(&self, ctx: &Context) -> Result<Vec<Record>> {
         let observed_at = Timestamp::now();
-        let patterns = ctx
-            .patterns(List::Executables)
-            .into_iter()
-            .chain(ctx.patterns(List::Paths));
         let mut seen = BTreeSet::new();
         let mut records = Vec::new();
-        for (tool, pattern) in patterns {
-            let matches = match glob::glob_with(&pattern, match_options()) {
-                Ok(matches) => matches,
-                Err(error) => {
-                    tracing::debug!(%tool, %pattern, %error, "skipping pattern");
-                    continue;
-                }
+        for definition in &ctx.definitions {
+            let Some(detect) = definition.detect.get(&ctx.platform) else {
+                continue;
             };
-            for found in matches {
-                match found {
-                    Ok(path) => {
-                        if seen.insert((tool, path.clone())) {
-                            let fact = Fact::ToolPresent {
-                                tool: tool.to_owned(),
-                                path,
-                            };
-                            records.push(ctx.record(
-                                self.source(),
-                                Evidence::Verified,
-                                observed_at,
-                                fact,
-                            ));
-                        }
+            let tool = definition.id.as_str();
+            for entry in detect.executables.iter().chain(&detect.paths) {
+                for path in ctx.existing(tool, entry) {
+                    if seen.insert((tool, path.clone())) {
+                        let fact = Fact::ToolPresent {
+                            tool: tool.to_owned(),
+                            path,
+                        };
+                        records.push(ctx.record(
+                            self.source(),
+                            Evidence::Verified,
+                            observed_at,
+                            fact,
+                        ));
                     }
-                    Err(error) => tracing::debug!(%tool, %error, "cannot read folder"),
                 }
             }
         }

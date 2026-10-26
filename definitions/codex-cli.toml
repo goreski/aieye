@@ -22,6 +22,28 @@ paths = [
     "%APPDATA%/npm/codex.cmd",
 ]
 
+[[folders.windows]]
+file = "~/.codex/config.toml"
+select = "projects.*"
+trust = "trust_level"
+# Trust decides whether project config and tools load; it does not restrict file
+# access.
+boundary = false
+
+[[mcp.windows]]
+file = "~/.codex/config.toml"
+select = "mcp_servers.*"
+# `env` sets variables for the server; `env_vars` passes variables through by name.
+env = ["env", "env_vars"]
+
 [verified.detect.windows]
+version = "0.164.0"
+date = 2026-10-26
+
+[verified.folders.windows]
+version = "0.164.0"
+date = 2026-10-26
+
+[verified.mcp.windows]
 version = "0.164.0"
 date = 2026-10-26

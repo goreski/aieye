@@ -80,6 +80,34 @@ pub enum Fact {
         pid: u32,
         exe: PathBuf,
     },
+    /// A tool's config names a folder, for example as a trusted project.
+    ConfiguredFolder {
+        tool: String,
+        /// The config file it was read from.
+        file: PathBuf,
+        /// The folder exactly as the config writes it.
+        path: String,
+        /// The config's trust value for the folder, if it has one.
+        trust: Option<String>,
+        /// Whether the tool restricts its file access to such folders.
+        boundary: bool,
+    },
+    /// A tool's config lists an MCP server. Secret values are never kept.
+    McpServer {
+        tool: String,
+        /// The config file it was read from.
+        file: PathBuf,
+        /// The entry the server is configured under, such as a project, if any.
+        scope: Option<String>,
+        name: String,
+        /// The program that starts a local server.
+        command: Option<String>,
+        /// Scheme, host and port of a remote server's URL; credentials, path and
+        /// query are dropped.
+        origin: Option<String>,
+        /// Names of the environment variables given to the server, never their values.
+        env_names: Vec<String>,
+    },
 }
 
 /// One fact, with the fields every record carries (concept §12).

@@ -17,6 +17,31 @@ executables = [
 ]
 paths = ["~/.claude", "~/.claude.json"]
 
+[[folders.windows]]
+file = "~/.claude.json"
+select = "projects.*"
+# Whether the user accepted the trust dialog for the folder. Trust lets the
+# project's settings load; it does not restrict file access.
+trust = "hasTrustDialogAccepted"
+boundary = false
+
+[[mcp.windows]]
+# User scope.
+file = "~/.claude.json"
+select = "mcpServers.*"
+
+[[mcp.windows]]
+# Local scope, per project.
+file = "~/.claude.json"
+select = "projects.*.mcpServers.*"
+
 [verified.detect.windows]
 version = "2.1.310"
 date = 2026-10-26
+
+[verified.folders.windows]
+version = "2.1.310"
+date = 2026-10-26
+
+# mcp is not verified: no MCP servers are configured on the development machine,
+# so the fields inside a server entry could not be checked.

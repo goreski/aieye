@@ -28,8 +28,10 @@ dependencies = [
  "dirs",
  "glob",
  "jiff",
+ "serde_json",
  "sysinfo",
  "tempfile",
+ "toml",
  "tracing",
 ]
 

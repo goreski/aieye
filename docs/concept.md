@@ -186,8 +186,11 @@ An optional organisation module can add account-side evidence for managed domain
 |---|---|---|
 | Codex `~/.codex/config.toml`, `[projects."<path>"] trust_level` | Trusted / untrusted project folders | declared |
 | Gemini CLI `~/.gemini/trustedFolders.json` | Trusted folder rules | declared |
-| Copilot CLI `~/.copilot/config.json`, `trustedFolders` | Trusted folders | declared |
-| Claude Code `~/.claude.json` (`projects`), `~/.claude/settings.json` | Folders used, permissions, MCP servers | declared · to verify |
+| Copilot CLI `~/.copilot/config.json` (JSON with `//` comments), `trustedFolders` | Trusted folders | declared · to verify: not set on the dev machine |
+| Claude Code `~/.claude.json`: `projects.<path>.hasTrustDialogAccepted` | Folders used and whether the user trusted them | declared |
+| Claude Code `~/.claude.json`: `mcpServers`, `projects.<path>.mcpServers` | MCP servers, user and per-project scope | declared · to verify: empty on the dev machine |
+| Claude Code `~/.claude/settings.json`: `permissions` (`allow`, `deny`, `additionalDirectories`) | Permission rules, extra folders | declared · to verify: not set on the dev machine |
+| Claude desktop (Store build) `%LOCALAPPDATA%\Claude-Data\claude_<publisher id>\claude_desktop_config.json`, `mcpServers` | MCP servers | declared |
 | Claude desktop `AppData\Roaming\Claude\…\scheduled-tasks.json` | Local scheduled tasks and their working folders | declared · reported by users, to verify |
 | Windows Task Scheduler (COM `ITaskService`) | OS scheduled jobs | verified |
 | NTFS permissions via the Windows Authz API | Effective folder access per account | verified |
@@ -222,7 +225,7 @@ AIEye ends up holding the most sensitive view of the machine. It is read-only by
 
 The local dashboard listens on `127.0.0.1` only, but AI processes on the same machine can reach that address too. It therefore requires a per-session token, and changing Guard policy requires administrator approval.
 
-Config parsers read only the fields a definition lists and never store secret values: for MCP servers, AIEye keeps the server name, its command or URL and the names of its environment variables, never their values, headers or tokens.
+Config parsers read only the fields a definition lists and never store secret values: for MCP servers, AIEye keeps the server name, its command or the scheme, host and port of its URL, and the names of its environment variables, never their values, arguments, headers or tokens. Credentials, paths and queries are cut from URLs because hosted MCP servers often carry tokens there.
 
 ## 14. Roadmap
 

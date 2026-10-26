@@ -11,6 +11,15 @@ platforms = ["windows", "macos"]
 executables = ["%ProgramFiles%/WindowsApps/Claude_*__pzs8sxrjxfjjc/app/Claude.exe"]
 paths = ["%APPDATA%/Claude"]
 
+[[mcp.windows]]
+# The Store build keeps its config here rather than in %APPDATA%\Claude.
+file = "%LOCALAPPDATA%/Claude-Data/claude_*/claude_desktop_config.json"
+select = "mcpServers.*"
+
 [verified.detect.windows]
+version = "3.6556.2.0"
+date = 2026-10-26
+
+[verified.mcp.windows]
 version = "3.6556.2.0"
 date = 2026-10-26

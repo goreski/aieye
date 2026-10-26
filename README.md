@@ -68,7 +68,7 @@ cd aieye
 cargo run -p aieye -- scan
 ```
 
-A scan is read-only. It runs as you, installs nothing, and in this version reads no file contents, only which files exist and which processes run. AIEye's own data is just a random device ID in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else.
+A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, and reads the user-level config files of known AI tools for their folders and MCP servers, keeping no secret values. AIEye's own data is just a random device ID in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else.
 
 ## Teach AIEye a new AI tool
 
@@ -104,7 +104,7 @@ Definitions so far: Claude Code, Claude desktop, Codex CLI, GitHub Copilot CLI. 
 2. **Every fact carries a label:** `verified`, `declared` or `inferred`.
 3. **Read-only by default.** Guard changes only the OS policy you configured.
 4. **Local-first.** Nothing leaves the device unless you turn on an optional console or gateway.
-5. **No secrets stored.** For each MCP server, AIEye keeps its name, its command or URL and the names of its environment variables. It never keeps their values, headers or tokens.
+5. **No secrets stored.** For each MCP server, AIEye keeps its name, its command or the scheme, host and port of its URL, and the names of its environment variables. It never keeps their values, arguments, headers or tokens.
 6. **Definitions are data, not code.**
 7. **AIEye protects itself.** Its own folder, policy and service are a no-go zone for AI processes.
 
@@ -112,7 +112,7 @@ Definitions so far: Claude Code, Claude desktop, Codex CLI, GitHub Copilot CLI. 
 
 | Version | Scope | |
 |---|---|---|
-| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; local dashboard | Slice 1 of 5 done |
+| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; local dashboard | Slices 1–2 of 5 done |
 | v0.2 Live watch | Windows service; ETW collector for process, file, DNS and network events; attribution across the whole process tree; recurring-pattern detection | |
 | v0.3 Guard v1 | Dedicated agent account with deny permissions; no-go policy; alerts on blocked attempts | |
 | v0.4 Cloud logs | Composio execution logs; vendor-declared lists; alerts when declared and observed activity differ | |

@@ -3,8 +3,10 @@
 //! The format is described in `definitions/README.md`.
 
 mod pattern;
+mod select;
 
 pub use pattern::{PatternError, expand};
+pub use select::{Segment, Selector};
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -75,6 +77,12 @@ pub struct Definition {
     /// How to recognise the tool, per platform.
     #[serde(default)]
     pub detect: BTreeMap<Platform, Detect>,
+    /// Where the tool's own config names folders, per platform.
+    #[serde(default)]
+    pub folders: BTreeMap<Platform, Vec<FolderSource>>,
+    /// Where the tool's own config lists MCP servers, per platform.
+    #[serde(default)]
+    pub mcp: BTreeMap<Platform, Vec<McpSource>>,
     /// Which sections were checked on a real install, per platform.
     #[serde(default)]
     pub verified: Verified,
@@ -92,12 +100,76 @@ pub struct Detect {
     pub paths: Vec<String>,
 }
 
+/// Where a tool's config names folders.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FolderSource {
+    /// The config file: a path pattern ending in `.json` or `.toml`.
+    pub file: String,
+    /// Where the entries are in the file.
+    pub select: Selector,
+    /// Where each entry's folder path is.
+    #[serde(default)]
+    pub path: PathFrom,
+    /// The field of each entry that holds the config's trust value, if any.
+    pub trust: Option<String>,
+    /// Whether the tool restricts its file access to these folders.
+    pub boundary: bool,
+}
+
+/// Where a selected entry's folder path is.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PathFrom {
+    /// The key the selector's last `*` matched, as in `projects.<path>`.
+    #[default]
+    Key,
+    /// The selected value itself, a string, as in a list of folders.
+    Value,
+}
+
+/// Where a tool's config lists MCP servers.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpSource {
+    /// The config file: a path pattern ending in `.json` or `.toml`.
+    pub file: String,
+    /// Where the servers are. It ends in `*`, whose key names each server.
+    pub select: Selector,
+    /// The field holding the command that starts a local server.
+    #[serde(default = "default_command")]
+    pub command: String,
+    /// The field holding a remote server's URL.
+    #[serde(default = "default_url")]
+    pub url: String,
+    /// The fields holding environment variables: an object of names to values, or
+    /// a list of `NAME` or `NAME=value` strings.
+    #[serde(default = "default_env")]
+    pub env: Vec<String>,
+}
+
+fn default_command() -> String {
+    "command".into()
+}
+
+fn default_url() -> String {
+    "url".into()
+}
+
+fn default_env() -> Vec<String> {
+    vec!["env".into()]
+}
+
 /// Sections checked on a real install, per platform.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Verified {
     #[serde(default)]
     pub detect: BTreeMap<Platform, Check>,
+    #[serde(default)]
+    pub folders: BTreeMap<Platform, Check>,
+    #[serde(default)]
+    pub mcp: BTreeMap<Platform, Check>,
 }
 
 /// One check of a section on a real install.
@@ -153,34 +225,99 @@ impl Definition {
             return Err("platforms must not be empty".into());
         }
         for (platform, detect) in &self.detect {
-            if !self.platforms.contains(platform) {
-                return Err(format!(
-                    "detect.{platform} is for a platform not listed in platforms"
-                ));
-            }
+            self.check_platform("detect", *platform)?;
             for entry in detect.executables.iter().chain(&detect.paths) {
                 pattern::check(entry).map_err(|error| format!("detect.{platform}: {error}"))?;
             }
         }
-        for (platform, check) in &self.verified.detect {
-            let section = format!("verified.detect.{platform}");
-            if !self.detect.contains_key(platform) {
-                return Err(format!(
-                    "{section} refers to a missing detect.{platform} section"
-                ));
-            }
-            if check.version.trim().is_empty() {
-                return Err(format!("{section}.version must not be empty"));
-            }
-            let date = &check.date;
-            if date.date.is_none() || date.time.is_some() || date.offset.is_some() {
-                return Err(format!(
-                    "{section}.date must be a plain date such as 2026-10-26"
-                ));
+        for (platform, sources) in &self.folders {
+            self.check_platform("folders", *platform)?;
+            for source in sources {
+                let section = format!("folders.{platform}");
+                check_file(&source.file).map_err(|error| format!("{section}: {error}"))?;
+                if source.path == PathFrom::Key && !source.select.ends_with_any() {
+                    return Err(format!(
+                        "{section}: select `{}` must end in `*` when path = \"key\"",
+                        source.select
+                    ));
+                }
+                if source.path == PathFrom::Value && source.trust.is_some() {
+                    return Err(format!(
+                        "{section}: trust needs path = \"key\"; a folder given as a plain value has no fields"
+                    ));
+                }
             }
         }
+        for (platform, sources) in &self.mcp {
+            self.check_platform("mcp", *platform)?;
+            for source in sources {
+                let section = format!("mcp.{platform}");
+                check_file(&source.file).map_err(|error| format!("{section}: {error}"))?;
+                if !source.select.ends_with_any() {
+                    return Err(format!(
+                        "{section}: select `{}` must end in `*`, which names each server",
+                        source.select
+                    ));
+                }
+            }
+        }
+        check_verified("detect", &self.verified.detect, |platform| {
+            self.detect.contains_key(&platform)
+        })?;
+        check_verified("folders", &self.verified.folders, |platform| {
+            self.folders.get(&platform).is_some_and(|s| !s.is_empty())
+        })?;
+        check_verified("mcp", &self.verified.mcp, |platform| {
+            self.mcp.get(&platform).is_some_and(|s| !s.is_empty())
+        })?;
         Ok(())
     }
+
+    fn check_platform(&self, section: &str, platform: Platform) -> Result<(), String> {
+        if self.platforms.contains(&platform) {
+            Ok(())
+        } else {
+            Err(format!(
+                "{section}.{platform} is for a platform not listed in platforms"
+            ))
+        }
+    }
+}
+
+/// Checks a config file pattern.
+fn check_file(file: &str) -> Result<(), String> {
+    pattern::check(file).map_err(|error| error.to_string())?;
+    if file.ends_with(".json") || file.ends_with(".toml") {
+        Ok(())
+    } else {
+        Err(format!("`{file}` must be a .json or .toml file"))
+    }
+}
+
+/// Checks the `verified.<section>` tables: each needs its section and a valid check.
+fn check_verified(
+    section: &str,
+    checks: &BTreeMap<Platform, Check>,
+    present: impl Fn(Platform) -> bool,
+) -> Result<(), String> {
+    for (platform, check) in checks {
+        let name = format!("verified.{section}.{platform}");
+        if !present(*platform) {
+            return Err(format!(
+                "{name} refers to a missing {section}.{platform} section"
+            ));
+        }
+        if check.version.trim().is_empty() {
+            return Err(format!("{name}.version must not be empty"));
+        }
+        let date = &check.date;
+        if date.date.is_none() || date.time.is_some() || date.offset.is_some() {
+            return Err(format!(
+                "{name}.date must be a plain date such as 2026-10-26"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn is_valid_id(id: &str) -> bool {
@@ -317,6 +454,83 @@ date = 2026-10-26
     fn rejects_verification_dates_with_a_time() {
         let text = VALID.replace("date = 2026-10-26", "date = 2026-10-26T10:00:00Z");
         assert!(rule_error(&text).contains("plain date"));
+    }
+
+    const WITH_CONFIGS: &str = r#"
+id = "codex-cli"
+name = "Codex CLI"
+vendor = "OpenAI"
+kind = "cli"
+platforms = ["windows"]
+
+[[folders.windows]]
+file = "~/.codex/config.toml"
+select = "projects.*"
+trust = "trust_level"
+boundary = false
+
+[[mcp.windows]]
+file = "~/.codex/config.toml"
+select = "mcp_servers.*"
+
+[verified.mcp.windows]
+version = "0.164.0"
+date = 2026-10-26
+"#;
+
+    #[test]
+    fn parses_config_sections_with_defaults() {
+        let definition = Definition::parse(WITH_CONFIGS).unwrap();
+        let folders = &definition.folders[&Platform::Windows][0];
+        assert_eq!(folders.path, PathFrom::Key);
+        assert_eq!(folders.trust.as_deref(), Some("trust_level"));
+        let mcp = &definition.mcp[&Platform::Windows][0];
+        assert_eq!(mcp.select.to_string(), "mcp_servers.*");
+        assert_eq!((mcp.command.as_str(), mcp.url.as_str()), ("command", "url"));
+        assert_eq!(mcp.env, ["env"]);
+    }
+
+    #[test]
+    fn rejects_bad_config_sections() {
+        for (from, to, expected) in [
+            (
+                r#"select = "mcp_servers.*""#,
+                r#"select = "mcp_servers""#,
+                "must end in `*`",
+            ),
+            (
+                r#"file = "~/.codex/config.toml"
+select = "projects.*""#,
+                r#"file = "~/.codex/config.yaml"
+select = "projects.*""#,
+                ".json or .toml",
+            ),
+            (
+                r#"trust = "trust_level""#,
+                r#"trust = "trust_level"
+path = "value""#,
+                "trust needs",
+            ),
+            (
+                "[verified.mcp.windows]",
+                "[verified.folders.linux]",
+                "missing folders.linux",
+            ),
+        ] {
+            let text = WITH_CONFIGS.replace(from, to);
+            assert!(rule_error(&text).contains(expected), "{to}");
+        }
+    }
+
+    #[test]
+    fn rejects_bad_selectors() {
+        for selector in ["projects..x", "pro*", ""] {
+            let text = WITH_CONFIGS.replace(r#""projects.*""#, &format!("\"{selector}\""));
+            assert!(
+                matches!(Definition::parse(&text), Err(DefinitionError::Syntax(_))),
+                "{selector}"
+            );
+        }
     }
 
     #[test]

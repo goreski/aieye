@@ -8,7 +8,7 @@ use glob::Pattern;
 use jiff::Timestamp;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
-use crate::{Collector, Context, List, match_options};
+use crate::{Collector, Context, match_options};
 
 /// Reports each running process whose executable matches a definition's
 /// `detect.executables`.
@@ -48,7 +48,7 @@ fn match_running(
 ) -> Vec<Record> {
     // Patterns were validated when their definitions were loaded.
     let patterns: Vec<(&str, Pattern)> = ctx
-        .patterns(List::Executables)
+        .executable_patterns()
         .into_iter()
         .filter_map(|(tool, pattern)| Some((tool, Pattern::new(&pattern).ok()?)))
         .collect();
