@@ -139,7 +139,7 @@ The v1.0 Windows minifilter driver is the exception: its language is decided whe
 
 ## 7. Definitions
 
-AI tools change every month, so knowledge of how to recognise and read them lives in updatable data files, not in code. New tools are supported by shipping a new definition, not a new app version. Definitions could be open and community-maintained, like ad-block filter lists. They are TOML files; see `definitions/README.md` for the format.
+AI tools change every month, so knowledge of how to recognise and read them lives in updatable data files, not in code. New tools are supported by shipping a new definition, not a new app version. Definitions are open and community-maintained, like ad-block filter lists, under the same Apache-2.0 licence as the code. They are TOML files; see `definitions/README.md` for the format.
 
 ## 8. Guard: no-go zones
 
@@ -250,5 +250,4 @@ v0.1 is built in slices: (1) tool detection from install paths and running proce
 
 - Language for the v1.0 Windows minifilter: C, or Rust via `windows-drivers-rs`?
 - Where to host the gateway?
-- Open-source the definitions? Licence for the project?
 - Name: "AIEye" has no conflict in AI monitoring, but an unrelated iOS app and a tool called "AI Bot Eye" exist. Check again before going public.

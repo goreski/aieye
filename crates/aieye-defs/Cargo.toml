@@ -4,6 +4,7 @@ description = "Loads and validates AIEye's AI tool definitions"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 glob.workspace = true

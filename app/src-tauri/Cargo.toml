@@ -4,6 +4,7 @@ description = "AIEye's desktop app: what AI tools can reach on this device, and 
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [build-dependencies]
 tauri-build.workspace = true

@@ -1,0 +1,69 @@
+name: New AI tool
+description: Ask for a definition for an AI tool AIEye doesn't know yet
+title: "Definition: "
+labels: ["definition"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! If you can, add the definition yourself: [CONTRIBUTING.md](https://github.com/goreski/aieye/blob/main/CONTRIBUTING.md) shows how in a few steps.
+
+        Replace your user name in paths with `you` (`C:\Users\you\…`). Never paste tokens, environment values or whole config files.
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: Name and vendor
+      placeholder: Cursor, by Anysphere
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Desktop app
+        - Command-line tool
+        - IDE extension
+        - Browser extension
+        - MCP server
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tool version
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: install
+    attributes:
+      label: How it was installed
+      placeholder: Installer, Microsoft Store, winget, npm, …
+  - type: textarea
+    id: paths
+    attributes:
+      label: Where it lives
+      description: Program files, data folders, and the processes it runs
+      placeholder: |
+        %LOCALAPPDATA%\Programs\cursor\Cursor.exe
+        ~/.cursor
+  - type: textarea
+    id: configs
+    attributes:
+      label: Config files with folders or MCP servers
+      description: The file and its key structure only, no values
+      placeholder: "~/.cursor/mcp.json: mcpServers.<name>.command"
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed my user name, secrets and config values from everything above
+          required: true

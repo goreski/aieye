@@ -1,0 +1,45 @@
+name: Bug report
+description: A crash, a tool AIEye misses, or a wrong record
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, don't open an issue: see [SECURITY.md](https://github.com/goreski/aieye/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: AIEye version or commit
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The relevant part of `aieye scan`, `diff` or the error, with your user name replaced by `you`
+      render: text
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed my user name, secrets and config values from everything above
+          required: true

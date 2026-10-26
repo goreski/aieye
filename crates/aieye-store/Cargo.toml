@@ -4,6 +4,7 @@ description = "AIEye's local store: saved snapshots and the device ID"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 aieye-model.workspace = true

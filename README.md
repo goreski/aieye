@@ -115,7 +115,7 @@ date = 2026-10-26
 2. Run `aieye scan` with the tool open and check that it is found.
 3. Add a `verified` table with the tool's version and today's date. This table is only for entries checked on a real install.
 
-Unknown fields are rejected, so a typo fails loudly instead of being ignored. The full format is in [`definitions/README.md`](definitions/README.md).
+Unknown fields are rejected, so a typo fails loudly instead of being ignored. The full format is in [`definitions/README.md`](definitions/README.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md) walks you through a pull request.
 
 Definitions so far: Antigravity (with `agy`), Claude Code, Claude desktop, Codex CLI, Gemini desktop, GitHub Copilot CLI. Not covered yet: Gemini CLI, Cursor, Windsurf, ChatGPT desktop, VS Code extensions (Copilot, Cline and others), Ollama, LM Studio, and the tools you use that we haven't heard of.
 
@@ -175,6 +175,10 @@ cargo test --workspace
 - AIEye watches AI tools. It is not built to resist an attacker deliberately hiding from it.
 - Phones are out of scope: iOS and Android don't let one app see what other apps do.
 
+## Contributing
+
+Definitions, bug reports and code are all welcome: start with [`CONTRIBUTING.md`](CONTRIBUTING.md). Report security problems privately, as [`SECURITY.md`](SECURITY.md) describes. Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
-Not chosen yet. A licence will be added before the first public release.
+AIEye, definitions included, is licensed under the [Apache License 2.0](LICENSE).

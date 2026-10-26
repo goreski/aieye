@@ -4,6 +4,7 @@ description = "The aieye command: shows what AI tools can reach on this device"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 aieye-collect.workspace = true

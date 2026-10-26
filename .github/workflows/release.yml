@@ -1,0 +1,63 @@
+name: Release
+
+# A tag like v0.1.0 builds the Windows installers and attaches them to a draft
+# release to review and publish. A manual run only builds them, as a workflow artifact.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Check the tag matches the version
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          app=$(jq -r .version app/src-tauri/tauri.conf.json)
+          crates=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -n 1)
+          if [ "$TAG" != "v$app" ] || [ "$TAG" != "v$crates" ]; then
+            echo "::error::Tag $TAG does not match app version $app and crate version $crates"
+            exit 1
+          fi
+      # Builds the frontend first (beforeBuildCommand), then the MSI and NSIS installers.
+      # They are not code-signed yet.
+      - name: Build
+        working-directory: app
+        run: |
+          npm ci
+          npm run tauri build
+      - name: Collect the installers
+        run: |
+          mkdir release
+          cp target/release/bundle/msi/*.msi target/release/bundle/nsis/*.exe release/
+          cd release
+          sha256sum --text -- *.msi *.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: aieye-windows
+          path: release/
+          if-no-files-found: error
+      - name: Draft the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" release/* --draft --verify-tag --title "AIEye $TAG" --generate-notes
