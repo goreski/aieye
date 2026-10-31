@@ -26,7 +26,7 @@
       {#each changes.lines as line, index (index)}
         <li class={line.severity}>
           <span class="level">{line.severity === "alert" ? "Alert" : "Info"}</span>
-          <span class="tool">{line.tool}</span>
+          <span class="tool">{line.tool ?? "—"}</span>
           <span class="what">{line.what}</span>
           <span class="detail path">{line.detail}</span>
         </li>

@@ -31,6 +31,13 @@ toml = "1.1.8"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 uuid = { version = "1.29.0", features = ["serde", "v4"] }
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Ole",
+    "Win32_System_TaskScheduler",
+    "Win32_System_Variant",
+] }
 
 [workspace.lints.rust]
 # Modules that call OS APIs directly opt in with #[allow(unsafe_code)].

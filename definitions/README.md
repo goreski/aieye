@@ -15,9 +15,10 @@ One TOML file per tool, named `<id>.toml`. AIEye rejects a file with unknown fie
 | `[detect.<platform>]` | How to recognise the tool on one platform |
 | `[[folders.<platform>]]` | Where the tool's own config names folders, such as trusted projects |
 | `[[mcp.<platform>]]` | Where the tool's own config lists MCP servers |
+| `[[schedules.<platform>]]` | Where the tool's own config lists tasks it runs on a schedule |
 | `[verified.<section>.<platform>]` | The `version` and `date` of the check of that section on a real install |
 
-More sections arrive with later slices of v0.1: `schedules`, and later `network`.
+A later version adds a `network` section.
 
 ### `detect`
 
@@ -50,6 +51,24 @@ Both read the tool's own config files, so every fact from them is labelled `decl
 | `env` | `mcp` | The fields holding environment variables: an object of names to values, or a list of `NAME` or `NAME=value`. Default `["env"]`. |
 
 AIEye never stores secret values from these files. For an MCP server it keeps the name, the command, the URL's scheme, host and port (credentials, path and query often carry tokens), and the names of environment variables. Arguments, headers and every value are dropped.
+
+### `schedules`
+
+Some AI apps run tasks of their own on a schedule, such as a prompt every weekday morning, and keep the list in a config file. Every fact from it is labelled `declared`. Each `[[schedules.<platform>]]` table is one place in a file:
+
+| Field | Meaning |
+|---|---|
+| `file` | The config file, as for `folders` and `mcp` |
+| `select` | Where the tasks are. It ends in `*`; each match is one task. |
+| `name` | The field holding the task's name. Without it, the key the last `*` matched names the task, so a list of tasks needs it. |
+| `schedule` | The fields that may hold a recurring schedule, such as `["cronExpression"]`; the first one a task has is used, as written. Default `["schedule"]`. |
+| `at` | The field holding a one-time run, for a task with no schedule: an ISO 8601 date and time with an offset, or Unix time in milliseconds. It is shown as, say, `once at 2027-06-01T07:00:00Z`. |
+| `folder` | The field holding the folder the task works in, if the config has one |
+| `enabled` | The field holding whether the task is switched on, if the config has one |
+
+A field is a key of the task's entry, or a dotted path into it, such as `trigger.cron`. AIEye keeps only the name, schedule, folder and on/off state. What a task does, such as its prompt, is never read into a fact.
+
+Tasks in the operating system's own scheduler need no definition: AIEye lists every one outside Windows' own folders, and links a task to a tool when it runs one of the tool's `executables`, or something inside one of its `paths`.
 
 ### Selectors
 
@@ -113,3 +132,4 @@ date = 2026-10-26
 - Store (MSIX) apps live in `C:\Program Files\WindowsApps`, which a standard user cannot list. They are found through their running processes and data folders; reading the package list directly comes later.
 - Only the user-level config files are read. Project-level files, such as a project's `.mcp.json`, come later.
 - Copilot CLI has no `folders` or `mcp` section yet: the development machine has no trusted folders or MCP config for it to check against.
+- Claude desktop's `schedules` are checked for the Code tab, with a throwaway task. Agent mode keeps its tasks in a file of the same shape that has held none yet, so the section as a whole stays unverified.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChangeList from "./ChangeList.svelte";
-  import { count } from "./format";
+  import Evidence from "./Evidence.svelte";
+  import { count, programs } from "./format";
   import type { ScanView, Status } from "./types";
 
   let { view, onselect }: { view: ScanView; onselect: (id: string) => void } = $props();
@@ -10,6 +11,11 @@
     installed: "Installed",
     config_only: "Config only",
   };
+
+  /** A tool's display name from its id. */
+  function toolName(id: string): string {
+    return view.tools.find((tool) => tool.id === id)?.name ?? id;
+  }
 </script>
 
 <section class="totals">
@@ -17,6 +23,7 @@
   <div><strong>{view.totals.running}</strong><span>AI processes running</span></div>
   <div><strong>{view.totals.folders}</strong><span>configured folders</span></div>
   <div><strong>{view.totals.servers}</strong><span>MCP servers</span></div>
+  <div><strong>{view.totals.schedules}</strong><span>AI schedules</span></div>
 </section>
 
 <ChangeList changes={view.changes} />
@@ -35,6 +42,7 @@
         <span>{count(tool.present.length, "install trace")}</span>
         <span>{count(tool.folders.length, "folder")}</span>
         <span>{count(tool.servers.length, "MCP server")}</span>
+        <span>{count(tool.schedules.length, "schedule")}</span>
       </span>
       <span class="checked muted">
         {tool.verified.length > 0
@@ -49,11 +57,50 @@
   <p class="muted">Also known, not found here: {view.not_found.join(", ")}.</p>
 {/if}
 
+<h2>Scheduled tasks on this device</h2>
+{#if view.tasks.length > 0}
+  <table>
+    <thead>
+      <tr><th>Task</th><th>Runs</th><th>When</th><th>AI tool</th><th>State</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+      {#each view.tasks as record, index (index)}
+        {#if record.fact.kind === "scheduled_task"}
+          <tr class:off={!record.fact.enabled}>
+            <td class="path">{record.fact.path}</td>
+            <td class="path">{programs(record.fact.actions)}</td>
+            <td>{record.fact.triggers.join("; ") || "no triggers"}</td>
+            <td>{record.fact.tool ? toolName(record.fact.tool) : "—"}</td>
+            <td>{record.fact.enabled ? "on" : "off"}</td>
+            <td><Evidence {record} /></td>
+          </tr>
+        {/if}
+      {/each}
+    </tbody>
+  </table>
+  <p class="muted note">
+    Every task outside Windows' own folders is listed, because an AI agent can create a task
+    that runs an ordinary program. A task is linked to an AI tool when it runs one of the
+    tool's programs or something in its folders. Arguments are never kept.
+  </p>
+{:else}
+  <p class="muted">No scheduled tasks outside Windows' own.</p>
+{/if}
+
 <style>
   .totals {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 12px;
+  }
+
+  tr.off td {
+    color: var(--muted);
+  }
+
+  .note {
+    font-size: 0.85rem;
+    margin-top: 6px;
   }
 
   .totals div {

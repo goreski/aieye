@@ -16,6 +16,30 @@ paths = ["%APPDATA%/Claude"]
 file = "%LOCALAPPDATA%/Claude-Data/claude_*/claude_desktop_config.json"
 select = "mcpServers.*"
 
+[[schedules.windows]]
+# Scheduled tasks of the Code tab, checked with a throwaway task in 4.4212.0.0 on
+# 2026-10-31. `fireAt` is a one-time run in Unix milliseconds. The prompt lives
+# apart, in the SKILL.md file that `filePath` names, and is never read.
+file = "%LOCALAPPDATA%/Claude-Data/claude_*/claude-code-sessions/*/*/scheduled-tasks.json"
+select = "scheduledTasks.*"
+name = "id"
+schedule = ["cronExpression"]
+at = "fireAt"
+folder = "cwd"
+enabled = "enabled"
+
+[[schedules.windows]]
+# Scheduled tasks of agent mode. The file has the same top-level shape but has held
+# no task yet, so its entries are assumed to match the Code tab's. Until one is
+# checked, this section stays unverified.
+file = "%LOCALAPPDATA%/Claude-Data/claude_*/local-agent-mode-sessions/*/*/scheduled-tasks.json"
+select = "scheduledTasks.*"
+name = "id"
+schedule = ["cronExpression"]
+at = "fireAt"
+folder = "cwd"
+enabled = "enabled"
+
 [verified.detect.windows]
 version = "3.6556.2.0"
 date = 2026-10-26

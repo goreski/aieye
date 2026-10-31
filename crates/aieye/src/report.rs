@@ -6,7 +6,8 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 
 /// The changes between two snapshots, one line each: new tools, then alerts, then
-/// the rest.
+/// the rest. A change that belongs to no AI tool, such as a new scheduled task, shows
+/// `-` as its tool.
 pub fn diff(from: &SnapshotInfo, to: &SnapshotInfo, diff: &Diff) -> String {
     let mut out = format!(
         "Changes from snapshot {} ({}) to {} ({})\n",
@@ -30,7 +31,7 @@ pub fn diff(from: &SnapshotInfo, to: &SnapshotInfo, diff: &Diff) -> String {
             Severity::Info => "info",
         };
         let (what, detail) = change.describe();
-        lines.push((level, &change.tool, what, detail));
+        lines.push((level, change.tool.as_deref().unwrap_or("-"), what, detail));
     }
     for tool in &diff.gone_tools {
         lines.push(("info", tool, "tool gone", String::new()));
@@ -132,6 +133,37 @@ mod tests {
                 "ALERT  claude-desktop  MCP server added  github (npx; env GITHUB_TOKEN)",
                 r"ALERT  codex-cli       folder changed    C:\work: trust untrusted → trusted",
             ]
+        );
+    }
+
+    #[test]
+    fn shows_a_dash_for_changes_without_a_tool() {
+        let task = Record {
+            source: Source::new("os:task-scheduler"),
+            evidence: Evidence::Verified,
+            ..record(Fact::ScheduledTask {
+                tool: None,
+                path: r"\Nightly".into(),
+                enabled: true,
+                author: None,
+                run_as: None,
+                actions: vec![aieye_model::TaskAction {
+                    program: "powershell.exe".into(),
+                    folder: None,
+                    has_arguments: true,
+                }],
+                triggers: vec!["daily at 02:00".into()],
+                last_run: None,
+                next_run: None,
+            })
+        };
+        let changes = aieye_model::diff(&[], &[task]);
+
+        let text = diff(&info(1), &info(2), &changes);
+
+        assert_eq!(
+            text.lines().nth(1),
+            Some(r"ALERT  -  scheduled task added  \Nightly: powershell.exe (daily at 02:00)")
         );
     }
 

@@ -56,6 +56,8 @@ One rule defines it:
 - Recurring patterns detected in file, network and cloud activity (e.g. "weekdays ~07:38 and 13:38").
 - Vendor-reported scheduled tasks, shown only as a cross-check.
 
+From v0.1, AIEye reads the first two. It lists every Windows Task Scheduler task outside Windows' own folders (`\Microsoft\`, and `\SoftLanding\`, whose tips tasks reschedule themselves all day), linked to an AI tool when it runs one of the tool's programs or something in its folders. Unlinked tasks count too: an AI agent can create a task that runs `powershell.exe`, and no definition would match it. AI apps' own schedules come from their config files through a definition's `schedules` section. Arguments and prompts are never kept.
+
 ### 5.4 Relationship map
 One map of the chains, with middlemen as their own step, for example:
 `Claude → Composio → user@example.org → Gmail` or `Codex → C:\Users\…\Projects`.
@@ -67,7 +69,7 @@ Each snapshot is compared with the previous one. Alerts for:
 - **Declared vs observed mismatch:** activity that matches no declared task; a declared task with no matching activity; activity from an app with no known access.
 - **Guard events:** every blocked attempt on a no-go zone.
 
-From v0.1, every scan is saved and `aieye diff` compares consecutive snapshots with fixed rules: a tool not in the older snapshot, and a configured folder or MCP server that was added or changed, are **alerts**; removals, install traces and running-process changes are **info**. Facts are matched by what they are about (tool and path, executable, config entry), not by process ID, and each change keeps the evidence label of its records.
+From v0.1, every scan is saved and `aieye diff` compares consecutive snapshots with fixed rules. **Alerts:** a tool not in the older snapshot; a configured folder, MCP server, scheduled task or AI schedule that was added; a configured folder or MCP server that changed; a scheduled task or AI schedule that now runs something else, at other times, as another account or in another folder, or that was switched on. **Info:** removals, schedules switched off, install traces and running-process changes. Facts are matched by what they are about (tool and path, executable, config entry, task path), not by process ID or a task's run times, and each change keeps the evidence label of its records.
 
 ### 5.6 History
 A timeline per AI tool, per folder and per account, exportable as CSV.
@@ -197,8 +199,8 @@ An optional organisation module can add account-side evidence for managed domain
 | Claude Code `~/.claude.json`: `mcpServers`, `projects.<path>.mcpServers` | MCP servers, user and per-project scope | declared · to verify: empty on the dev machine |
 | Claude Code `~/.claude/settings.json`: `permissions` (`allow`, `deny`, `additionalDirectories`) | Permission rules, extra folders | declared · to verify: not set on the dev machine |
 | Claude desktop (Store build) `%LOCALAPPDATA%\Claude-Data\claude_<publisher id>\claude_desktop_config.json`, `mcpServers` | MCP servers | declared |
-| Claude desktop `AppData\Roaming\Claude\…\scheduled-tasks.json` | Local scheduled tasks and their working folders | declared · reported by users, to verify |
-| Windows Task Scheduler (COM `ITaskService`) | OS scheduled jobs | verified |
+| Claude desktop `%LOCALAPPDATA%\Claude-Data\claude_<publisher id>\{claude-code-sessions,local-agent-mode-sessions}\<id>\<id>\scheduled-tasks.json`, `scheduledTasks.*`: `id`, `cronExpression` or `fireAt` (Unix ms), `cwd`, `enabled`, `permissionMode` | The app's own scheduled tasks; prompts are kept apart as `SKILL.md` files | declared · Code tab checked with a throwaway task; agent mode to verify: empty on the dev machine |
+| Windows Task Scheduler (COM `ITaskService`) | OS scheduled tasks: actions, triggers, run-as account, run times | verified · checked on the dev machine |
 | NTFS permissions via the Windows Authz API | Effective folder access per account | verified |
 | ETW `Microsoft-Windows-Kernel-Process` | Process starts and stops with parent process (process tree) | verified · to verify |
 | ETW `Microsoft-Windows-Kernel-File` | File opens by process | verified · to verify |

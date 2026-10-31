@@ -45,6 +45,29 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX records_by_snapshot ON records (snapshot_id);
     CREATE INDEX records_by_key ON records (fact_key);",
+    // 2: a scheduled task may belong to no AI tool, so `tool` may be NULL. SQLite
+    // cannot drop NOT NULL from a column, so the table is rebuilt.
+    "CREATE TABLE records_new (
+        snapshot_id INTEGER NOT NULL REFERENCES snapshots (id) ON DELETE CASCADE,
+        device_id TEXT NOT NULL,
+        org_id TEXT,
+        source TEXT NOT NULL,
+        evidence TEXT NOT NULL,
+        observed_at TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        tool TEXT,
+        fact_key TEXT NOT NULL,
+        record TEXT NOT NULL
+    );
+    INSERT INTO records_new (snapshot_id, device_id, org_id, source, evidence,
+        observed_at, kind, tool, fact_key, record)
+    SELECT snapshot_id, device_id, org_id, source, evidence,
+        observed_at, kind, tool, fact_key, record
+    FROM records ORDER BY rowid;
+    DROP TABLE records;
+    ALTER TABLE records_new RENAME TO records;
+    CREATE INDEX records_by_snapshot ON records (snapshot_id);
+    CREATE INDEX records_by_key ON records (fact_key);",
 ];
 
 /// A saved snapshot, without its records.
@@ -273,6 +296,48 @@ mod tests {
         let store = Store::open_in(dir.path()).unwrap();
 
         assert_eq!(store.load(id).unwrap().records.len(), 1);
+    }
+
+    #[test]
+    fn upgrades_a_first_version_database_and_keeps_its_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(FILE_NAME);
+        let old = snapshot(DeviceId::random(), 2);
+        let old_id = {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(MIGRATIONS[0]).unwrap();
+            conn.pragma_update(None, "user_version", 1).unwrap();
+            Store { conn }.save(&old).unwrap()
+        };
+
+        let mut store = Store::open(&path).unwrap();
+
+        assert_eq!(store.load(old_id).unwrap(), old);
+        let taken_at: Timestamp = "2026-10-31T12:00:00Z".parse().unwrap();
+        let without_tool = Snapshot {
+            device_id: old.device_id,
+            taken_at,
+            records: vec![Record {
+                device_id: old.device_id,
+                org_id: None,
+                source: Source::new("os:task-scheduler"),
+                evidence: Evidence::Verified,
+                observed_at: taken_at,
+                fact: Fact::ScheduledTask {
+                    tool: None,
+                    path: r"\Backup".into(),
+                    enabled: true,
+                    author: None,
+                    run_as: None,
+                    actions: Vec::new(),
+                    triggers: vec!["at logon".into()],
+                    last_run: None,
+                    next_run: None,
+                },
+            }],
+        };
+        let id = store.save(&without_tool).unwrap();
+        assert_eq!(store.load(id).unwrap(), without_tool);
     }
 
     #[test]

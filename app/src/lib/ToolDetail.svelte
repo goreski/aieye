@@ -1,5 +1,6 @@
 <script lang="ts">
   import Evidence from "./Evidence.svelte";
+  import { programs } from "./format";
   import type { ToolView } from "./types";
 
   let { tool, onback }: { tool: ToolView; onback: () => void } = $props();
@@ -106,6 +107,43 @@
   </p>
 {:else}
   <p class="muted">The tool's config lists no MCP servers.</p>
+{/if}
+
+<h2>Schedules</h2>
+{#if tool.schedules.length > 0}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>When</th><th>Runs</th><th>State</th><th>Where it is recorded</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+      {#each tool.schedules as record, index (index)}
+        {#if record.fact.kind === "tool_schedule"}
+          <tr>
+            <td><strong>{record.fact.name}</strong></td>
+            <td class="path">{record.fact.schedule ?? "—"}</td>
+            <td class="path">{record.fact.folder ? `in ${record.fact.folder}` : "—"}</td>
+            <td>{record.fact.enabled === null ? "—" : record.fact.enabled ? "on" : "off"}</td>
+            <td class="path">{record.fact.file}</td>
+            <td><Evidence {record} /></td>
+          </tr>
+        {:else if record.fact.kind === "scheduled_task"}
+          <tr>
+            <td class="path"><strong>{record.fact.path}</strong></td>
+            <td>{record.fact.triggers.join("; ") || "no triggers"}</td>
+            <td class="path">{programs(record.fact.actions)}</td>
+            <td>{record.fact.enabled ? "on" : "off"}</td>
+            <td>Windows Task Scheduler</td>
+            <td><Evidence {record} /></td>
+          </tr>
+        {/if}
+      {/each}
+    </tbody>
+  </table>
+  <p class="muted note">
+    What a schedule does, such as its prompt, and a task's arguments are never kept.
+  </p>
+{:else}
+  <p class="muted">No schedules found for this tool.</p>
 {/if}
 
 <style>

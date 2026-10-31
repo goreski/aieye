@@ -4,14 +4,16 @@
 mod configs;
 mod filesystem;
 mod processes;
+mod tasks;
 
 pub use configs::Configs;
 pub use filesystem::Filesystem;
 pub use processes::Processes;
+pub use tasks::ScheduledTasks;
 
 use std::path::PathBuf;
 
-use aieye_defs::{Definition, Platform};
+use aieye_defs::{Definition, Detect, Platform};
 use aieye_model::{DeviceId, Evidence, Fact, OrgId, Record, Snapshot, Source};
 use anyhow::{Context as _, Result};
 use glob::MatchOptions;
@@ -29,7 +31,7 @@ pub trait Collector {
 /// Runs every collector and combines their records into one snapshot.
 pub fn scan(ctx: &Context) -> Result<Snapshot> {
     let taken_at = Timestamp::now();
-    let collectors: [&dyn Collector; 3] = [&Filesystem, &Processes, &Configs];
+    let collectors: [&dyn Collector; 4] = [&Filesystem, &Processes, &Configs, &ScheduledTasks];
     let mut records = Vec::new();
     for collector in collectors {
         let found = collector
@@ -113,12 +115,22 @@ impl Context {
     /// The glob patterns of every definition's `detect.executables` for this
     /// platform, as (tool id, pattern) pairs.
     fn executable_patterns(&self) -> Vec<(&str, String)> {
+        self.detect_patterns(|detect| &detect.executables)
+    }
+
+    /// The glob patterns of every definition's `detect.paths` for this platform, as
+    /// (tool id, pattern) pairs.
+    fn path_patterns(&self) -> Vec<(&str, String)> {
+        self.detect_patterns(|detect| &detect.paths)
+    }
+
+    fn detect_patterns(&self, list: fn(&Detect) -> &Vec<String>) -> Vec<(&str, String)> {
         let mut patterns = Vec::new();
         for definition in &self.definitions {
             let Some(detect) = definition.detect.get(&self.platform) else {
                 continue;
             };
-            for entry in &detect.executables {
+            for entry in list(detect) {
                 if let Some(pattern) = self.expand(&definition.id, entry) {
                     patterns.push((definition.id.as_str(), pattern));
                 }

@@ -30,7 +30,7 @@ AIEye works like antivirus, with two parts:
 
 ## What a scan looks like
 
-On the development machine, one `aieye scan` finds 6 AI tools: 25 install traces, 24 AI processes running right now, 11 folders and 2 MCP servers named in their configs. Every finding is a record like this one:
+On the development machine, one `aieye scan` finds 6 AI tools: 26 install traces, 12 AI processes running right now, 11 folders and 2 MCP servers named in their configs, and 13 scheduled tasks to check for AI. Every finding is a record like this one:
 
 ```json
 {
@@ -75,9 +75,9 @@ cargo run -p aieye -- diff
 cargo run -p aieye -- history
 ```
 
-`diff` marks a new AI tool, and a folder or MCP server that was added or changed, as an **alert**; everything else, such as a tool that stopped running, is **info**. Add `--json` for machine-readable output.
+`diff` marks a new AI tool, a folder or MCP server that was added or changed, and a scheduled task or AI schedule that was added, runs more, or was switched on, as an **alert**; everything else, such as a tool that stopped running, is **info**. Add `--json` for machine-readable output.
 
-A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, and reads the user-level config files of known AI tools for their folders and MCP servers, keeping no secret values. AIEye's own data, a random device ID and the saved snapshots (`aieye.db`), lives in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else, or `scan --no-save` to skip saving.
+A scan is read-only. It runs as you and installs nothing. It checks which files exist and which processes run, reads the user-level config files of known AI tools for their folders, MCP servers and schedules, and lists Task Scheduler's tasks outside Windows' own, keeping no secret values, arguments or prompts. AIEye's own data, a random device ID and the saved snapshots (`aieye.db`), lives in `%LOCALAPPDATA%\AIEye`. Use `--data-dir` to put it somewhere else, or `scan --no-save` to skip saving.
 
 ### Desktop app
 
@@ -133,7 +133,7 @@ Definitions so far: Antigravity (with `agy`), Claude Code, Claude desktop, Codex
 
 | Version | Scope | |
 |---|---|---|
-| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | Slices 1–4 of 5 done |
+| **v0.1 Inventory** | Detect AI tools; parse trusted folders and MCP servers; Task Scheduler and local AI schedulers; snapshots and diffs; desktop app | All 5 slices done |
 | v0.2 Live watch | Windows service; ETW collector for process, file, DNS and network events; attribution across the whole process tree; recurring-pattern detection | |
 | v0.3 Guard v1 | Dedicated agent account with deny permissions; no-go policy; alerts on blocked attempts | |
 | v0.4 Cloud logs | Composio execution logs; vendor-declared lists; alerts when declared and observed activity differ | |

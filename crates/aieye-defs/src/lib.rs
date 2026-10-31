@@ -83,6 +83,9 @@ pub struct Definition {
     /// Where the tool's own config lists MCP servers, per platform.
     #[serde(default)]
     pub mcp: BTreeMap<Platform, Vec<McpSource>>,
+    /// Where the tool's own config lists tasks it runs on a schedule, per platform.
+    #[serde(default)]
+    pub schedules: BTreeMap<Platform, Vec<ScheduleSource>>,
     /// Which sections were checked on a real install, per platform.
     #[serde(default)]
     pub verified: Verified,
@@ -160,6 +163,35 @@ fn default_env() -> Vec<String> {
     vec!["env".into()]
 }
 
+/// Where a tool's config lists the tasks it runs on a schedule. Fields are keys of an
+/// entry, or dotted paths into it such as `trigger.cron`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleSource {
+    /// The config file: a path pattern ending in `.json` or `.toml`.
+    pub file: String,
+    /// Where the tasks are. It ends in `*`; each match is one task.
+    pub select: Selector,
+    /// The field holding the task's name. Without it, the key the last `*` matched
+    /// names the task, so a list of tasks needs it.
+    pub name: Option<String>,
+    /// The fields that may hold the schedule, such as a cron expression; the first
+    /// one an entry has is used.
+    #[serde(default = "default_schedule")]
+    pub schedule: Vec<String>,
+    /// The field holding the time of a one-time run, for an entry with no schedule:
+    /// an ISO 8601 date and time with an offset, or Unix time in milliseconds.
+    pub at: Option<String>,
+    /// The field holding the folder the task works in, if the config has one.
+    pub folder: Option<String>,
+    /// The field holding whether the task is switched on, if the config has one.
+    pub enabled: Option<String>,
+}
+
+fn default_schedule() -> Vec<String> {
+    vec!["schedule".into()]
+}
+
 /// Sections checked on a real install, per platform.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -170,6 +202,8 @@ pub struct Verified {
     pub folders: BTreeMap<Platform, Check>,
     #[serde(default)]
     pub mcp: BTreeMap<Platform, Check>,
+    #[serde(default)]
+    pub schedules: BTreeMap<Platform, Check>,
 }
 
 /// One check of a section on a real install.
@@ -261,6 +295,31 @@ impl Definition {
                 }
             }
         }
+        for (platform, sources) in &self.schedules {
+            self.check_platform("schedules", *platform)?;
+            for source in sources {
+                let section = format!("schedules.{platform}");
+                check_file(&source.file).map_err(|error| format!("{section}: {error}"))?;
+                if !source.select.ends_with_any() {
+                    return Err(format!(
+                        "{section}: select `{}` must end in `*`, which matches each task",
+                        source.select
+                    ));
+                }
+                let fields = source
+                    .name
+                    .iter()
+                    .chain(&source.schedule)
+                    .chain(&source.at)
+                    .chain(&source.folder)
+                    .chain(&source.enabled);
+                for field in fields {
+                    if field.is_empty() || field.split('.').any(str::is_empty) {
+                        return Err(format!("{section}: field `{field}` has an empty step"));
+                    }
+                }
+            }
+        }
         check_verified("detect", &self.verified.detect, |platform| {
             self.detect.contains_key(&platform)
         })?;
@@ -269,6 +328,9 @@ impl Definition {
         })?;
         check_verified("mcp", &self.verified.mcp, |platform| {
             self.mcp.get(&platform).is_some_and(|s| !s.is_empty())
+        })?;
+        check_verified("schedules", &self.verified.schedules, |platform| {
+            self.schedules.get(&platform).is_some_and(|s| !s.is_empty())
         })?;
         Ok(())
     }
@@ -518,6 +580,68 @@ path = "value""#,
             ),
         ] {
             let text = WITH_CONFIGS.replace(from, to);
+            assert!(rule_error(&text).contains(expected), "{to}");
+        }
+    }
+
+    const WITH_SCHEDULES: &str = r#"
+id = "claude-desktop"
+name = "Claude"
+vendor = "Anthropic"
+kind = "desktop-app"
+platforms = ["windows"]
+
+[[schedules.windows]]
+file = "%LOCALAPPDATA%/App/tasks.json"
+select = "scheduledTasks.*"
+name = "id"
+schedule = ["cronExpression"]
+at = "fireAt"
+enabled = "enabled"
+
+[verified.schedules.windows]
+version = "1"
+date = 2026-10-31
+"#;
+
+    #[test]
+    fn parses_schedule_sections() {
+        let definition = Definition::parse(WITH_SCHEDULES).unwrap();
+        let source = &definition.schedules[&Platform::Windows][0];
+        assert_eq!(source.name.as_deref(), Some("id"));
+        assert_eq!(source.schedule, ["cronExpression"]);
+        assert_eq!(source.at.as_deref(), Some("fireAt"));
+        assert_eq!(source.folder, None);
+
+        let defaults = Definition::parse(
+            &WITH_SCHEDULES
+                .replace("name = \"id\"\n", "")
+                .replace("schedule = [\"cronExpression\"]\n", ""),
+        )
+        .unwrap();
+        let source = &defaults.schedules[&Platform::Windows][0];
+        assert_eq!(
+            (source.name.as_deref(), source.schedule.as_slice()),
+            (None, &["schedule".to_owned()][..])
+        );
+    }
+
+    #[test]
+    fn rejects_bad_schedule_sections() {
+        for (from, to, expected) in [
+            (
+                r#"select = "scheduledTasks.*""#,
+                r#"select = "scheduledTasks""#,
+                "must end in `*`",
+            ),
+            (r#"at = "fireAt""#, r#"at = "fire..at""#, "empty step"),
+            (
+                "[verified.schedules.windows]",
+                "[verified.mcp.windows]",
+                "missing mcp.windows",
+            ),
+        ] {
+            let text = WITH_SCHEDULES.replace(from, to);
             assert!(rule_error(&text).contains(expected), "{to}");
         }
     }

@@ -15,6 +15,9 @@ pub struct ScanView {
     pub tools: Vec<ToolView>,
     /// Names of known tools with no facts on this device.
     pub not_found: Vec<String>,
+    /// Every scheduled task on the device outside Windows' own, linked to an AI tool
+    /// or not, by path.
+    pub tasks: Vec<Record>,
     /// Changes since the snapshot before, unless this is the first.
     pub changes: Option<ChangesView>,
 }
@@ -26,6 +29,10 @@ pub struct Totals {
     pub running: usize,
     pub folders: usize,
     pub servers: usize,
+    /// Schedules linked to AI tools: their own, and scheduled tasks that run them.
+    pub schedules: usize,
+    /// Scheduled tasks on the device, linked or not.
+    pub tasks: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -49,6 +56,8 @@ pub struct ToolView {
     pub running: Vec<Record>,
     pub folders: Vec<Record>,
     pub servers: Vec<Record>,
+    /// The tool's own schedules and the scheduled tasks that run it.
+    pub schedules: Vec<Record>,
 }
 
 #[derive(Debug, Serialize)]
@@ -62,7 +71,8 @@ pub struct ChangesView {
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct ChangeLine {
     pub severity: Severity,
-    pub tool: String,
+    /// The AI tool, unless the change belongs to none, as a new scheduled task may.
+    pub tool: Option<String>,
     pub what: &'static str,
     pub detail: String,
 }
@@ -77,8 +87,14 @@ pub fn view(
     previous: Option<(SnapshotInfo, Diff)>,
 ) -> ScanView {
     let mut tools: Vec<ToolView> = Vec::new();
+    let mut tasks = Vec::new();
     for record in &snapshot.records {
-        let id = record.fact.tool();
+        if let Fact::ScheduledTask { .. } = record.fact {
+            tasks.push(record.clone());
+        }
+        let Some(id) = record.fact.tool() else {
+            continue;
+        };
         let index = match tools.iter().position(|tool| tool.id == id) {
             Some(index) => index,
             None => {
@@ -92,9 +108,14 @@ pub fn view(
             Fact::ToolRunning { .. } => &mut tool.running,
             Fact::ConfiguredFolder { .. } => &mut tool.folders,
             Fact::McpServer { .. } => &mut tool.servers,
+            Fact::ScheduledTask { .. } | Fact::ToolSchedule { .. } => &mut tool.schedules,
         };
         list.push(record.clone());
     }
+    tasks.sort_by_cached_key(|record| match &record.fact {
+        Fact::ScheduledTask { path, .. } => path.to_lowercase(),
+        _ => String::new(),
+    });
     for tool in &mut tools {
         tool.status = if !tool.running.is_empty() {
             Status::Running
@@ -111,6 +132,8 @@ pub fn view(
         running: tools.iter().map(|tool| tool.running.len()).sum(),
         folders: tools.iter().map(|tool| tool.folders.len()).sum(),
         servers: tools.iter().map(|tool| tool.servers.len()).sum(),
+        schedules: tools.iter().map(|tool| tool.schedules.len()).sum(),
+        tasks: tasks.len(),
     };
     let not_found = definitions
         .iter()
@@ -127,6 +150,7 @@ pub fn view(
         totals,
         tools,
         not_found,
+        tasks,
         changes,
     }
 }
@@ -145,6 +169,9 @@ fn tool_view(id: &str, definitions: &[Definition], platform: Platform) -> ToolVi
         if checked.mcp.contains_key(&platform) {
             verified.push("mcp");
         }
+        if checked.schedules.contains_key(&platform) {
+            verified.push("schedules");
+        }
     }
     ToolView {
         id: id.to_owned(),
@@ -156,29 +183,30 @@ fn tool_view(id: &str, definitions: &[Definition], platform: Platform) -> ToolVi
         running: Vec::new(),
         folders: Vec::new(),
         servers: Vec::new(),
+        schedules: Vec::new(),
     }
 }
 
 fn change_lines(diff: &Diff) -> Vec<ChangeLine> {
-    let line = |severity, tool: &str, what, detail| ChangeLine {
+    let line = |severity, tool: Option<&str>, what, detail| ChangeLine {
         severity,
-        tool: tool.to_owned(),
+        tool: tool.map(str::to_owned),
         what,
         detail,
     };
     let mut lines: Vec<ChangeLine> = diff
         .new_tools
         .iter()
-        .map(|tool| line(Severity::Alert, tool, "new tool", String::new()))
+        .map(|tool| line(Severity::Alert, Some(tool), "new tool", String::new()))
         .collect();
     lines.extend(diff.changes.iter().map(|change| {
         let (what, detail) = change.describe();
-        line(change.severity, &change.tool, what, detail)
+        line(change.severity, change.tool.as_deref(), what, detail)
     }));
     lines.extend(
         diff.gone_tools
             .iter()
-            .map(|tool| line(Severity::Info, tool, "tool gone", String::new())),
+            .map(|tool| line(Severity::Info, Some(tool), "tool gone", String::new())),
     );
     lines
 }
@@ -280,7 +308,9 @@ mod tests {
                 tools: 2,
                 running: 1,
                 folders: 1,
-                servers: 0
+                servers: 0,
+                schedules: 0,
+                tasks: 0,
             }
         );
         assert_eq!(view.tools[1].verified, ["detect"]);
@@ -315,21 +345,67 @@ mod tests {
         );
 
         let changes = view.changes.unwrap();
-        let lines: Vec<(Severity, &str, &str)> = changes
+        let lines: Vec<(Severity, Option<&str>, &str)> = changes
             .lines
             .iter()
-            .map(|line| (line.severity, line.tool.as_str(), line.what))
+            .map(|line| (line.severity, line.tool.as_deref(), line.what))
             .collect();
         assert_eq!(
             lines,
             [
-                (Severity::Alert, "new", "new tool"),
-                (Severity::Alert, "new", "MCP server added"),
-                (Severity::Info, "old", "gone"),
-                (Severity::Info, "old", "tool gone"),
+                (Severity::Alert, Some("new"), "new tool"),
+                (Severity::Alert, Some("new"), "MCP server added"),
+                (Severity::Info, Some("old"), "gone"),
+                (Severity::Info, Some("old"), "tool gone"),
             ]
         );
         assert_eq!(changes.alerts, 2);
         assert_eq!(changes.from.id, 1);
+    }
+
+    fn task(tool: Option<&str>, path: &str) -> Record {
+        record(Fact::ScheduledTask {
+            tool: tool.map(str::to_owned),
+            path: path.into(),
+            enabled: true,
+            author: None,
+            run_as: None,
+            actions: Vec::new(),
+            triggers: vec!["at logon".into()],
+            last_run: None,
+            next_run: None,
+        })
+    }
+
+    #[test]
+    fn lists_every_scheduled_task_and_gives_linked_ones_to_their_tool() {
+        let definitions = [definition("alpha", "Alpha", false)];
+        let records = vec![
+            task(None, r"\Zeta"),
+            task(Some("alpha"), r"\Alpha nightly"),
+            record(Fact::ToolSchedule {
+                tool: "alpha".into(),
+                file: "tasks.json".into(),
+                name: "digest".into(),
+                schedule: Some("0 7 * * *".into()),
+                folder: None,
+                enabled: Some(true),
+            }),
+        ];
+
+        let view = view(info(1), &snapshot(records), &definitions, WINDOWS, None);
+
+        let paths: Vec<&str> = view
+            .tasks
+            .iter()
+            .map(|record| match &record.fact {
+                Fact::ScheduledTask { path, .. } => path.as_str(),
+                other => panic!("unexpected fact {other:?}"),
+            })
+            .collect();
+        assert_eq!(paths, [r"\Alpha nightly", r"\Zeta"]);
+        assert_eq!(view.tools.len(), 1);
+        assert_eq!(view.tools[0].schedules.len(), 2);
+        assert_eq!((view.totals.schedules, view.totals.tasks), (2, 2));
     }
 }

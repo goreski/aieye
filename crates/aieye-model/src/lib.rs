@@ -113,6 +113,49 @@ pub enum Fact {
         /// Names of the environment variables given to the server, never their values.
         env_names: Vec<String>,
     },
+    /// A task in the operating system's scheduler. Windows' own tasks, in the
+    /// `\Microsoft\` and `\SoftLanding\` folders, are left out.
+    ScheduledTask {
+        /// The AI tool a definition links the task to, if any.
+        tool: Option<String>,
+        /// The task's folder and name, such as `\Vendor\Update`.
+        path: String,
+        enabled: bool,
+        /// The author stored with the task, as whoever registered it wrote it.
+        author: Option<String>,
+        /// The account the task runs as.
+        run_as: Option<String>,
+        actions: Vec<TaskAction>,
+        /// When the task runs, in words, such as "daily at 07:38".
+        triggers: Vec<String>,
+        /// When the task last ran and next runs. Changes to these are not reported.
+        last_run: Option<Timestamp>,
+        next_run: Option<Timestamp>,
+    },
+    /// A tool's config lists a task of its own that runs on a schedule. What the task
+    /// does, such as its prompt, is never kept.
+    ToolSchedule {
+        tool: String,
+        /// The config file it was read from.
+        file: PathBuf,
+        name: String,
+        /// The schedule exactly as the config writes it, such as a cron expression.
+        schedule: Option<String>,
+        /// The folder the task works in, as the config writes it.
+        folder: Option<String>,
+        enabled: Option<bool>,
+    },
+}
+
+/// What a scheduled task starts. Arguments are never kept: they can carry tokens.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskAction {
+    /// The program, or `COM handler {class ID}` for an action that calls a COM object.
+    pub program: String,
+    /// The folder the program starts in, if set.
+    pub folder: Option<String>,
+    /// Whether the program is given arguments.
+    pub has_arguments: bool,
 }
 
 /// One fact, with the fields every record carries (concept §12).

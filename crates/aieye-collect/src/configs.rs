@@ -1,9 +1,12 @@
-//! Reads the folders and MCP servers that AI tools' own config files declare.
+//! Reads the folders, MCP servers and schedules that AI tools' own config files
+//! declare.
 //!
-//! Config files hold secrets, such as API keys in MCP server settings. This
-//! collector keeps only what the facts allow: folder paths, trust values, server
-//! names and commands, URL origins and environment variable names. The rest of a
-//! file is dropped once the scan is done with it, and error messages never quote it.
+//! Config files hold secrets, such as API keys in MCP server settings, and private
+//! text, such as the prompts of scheduled tasks. This collector keeps only what the
+//! facts allow: folder paths, trust values, server names and commands, URL origins,
+//! environment variable names, and task names, schedules, folders and on/off states.
+//! The rest of a file is dropped once the scan is done with it, and error messages
+//! never quote it.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -20,8 +23,8 @@ use crate::{Collector, Context};
 /// Config files larger than this are skipped.
 const MAX_FILE_SIZE: u64 = 32 * 1024 * 1024;
 
-/// Reports the folders and MCP servers in the config files that definitions name.
-/// A tool's own config is a claim, so every fact is `declared`.
+/// Reports the folders, MCP servers and schedules in the config files that
+/// definitions name. A tool's own config is a claim, so every fact is `declared`.
 ///
 /// A file that cannot be read or parsed is logged and skipped, so one broken config
 /// does not hide the rest of the scan.
@@ -91,6 +94,54 @@ impl Collector for Configs {
                                 .and_then(Value::as_str)
                                 .and_then(origin),
                             env_names: env_names(server, &source.env),
+                        });
+                    }
+                }
+            }
+            for source in definition
+                .schedules
+                .get(&ctx.platform)
+                .into_iter()
+                .flatten()
+            {
+                for file in ctx.existing(tool, &source.file) {
+                    let Some(document) = documents.get(&file) else {
+                        continue;
+                    };
+                    for entry in select(document, &source.select) {
+                        if !entry.value.is_object() {
+                            continue;
+                        }
+                        let name = match &source.name {
+                            Some(name) => field(entry.value, name).and_then(scalar_text),
+                            None => entry.keys.last().cloned(),
+                        };
+                        let Some(name) = name else {
+                            continue;
+                        };
+                        facts.push(Fact::ToolSchedule {
+                            tool: tool.to_owned(),
+                            file: file.clone(),
+                            name,
+                            schedule: source
+                                .schedule
+                                .iter()
+                                .find_map(|path| field(entry.value, path).and_then(scalar_text))
+                                .or_else(|| {
+                                    let path = source.at.as_ref()?;
+                                    field(entry.value, path).and_then(one_time)
+                                }),
+                            folder: source
+                                .folder
+                                .as_ref()
+                                .and_then(|path| field(entry.value, path))
+                                .and_then(Value::as_str)
+                                .map(str::to_owned),
+                            enabled: source
+                                .enabled
+                                .as_ref()
+                                .and_then(|path| field(entry.value, path))
+                                .and_then(Value::as_bool),
                         });
                     }
                 }
@@ -209,6 +260,27 @@ fn step<'a>(entry: Entry<'a>, segment: &Segment) -> Vec<Entry<'a>> {
             .collect(),
         _ => Vec::new(),
     }
+}
+
+/// The value at a field of an entry: a key, or a dotted path such as `trigger.cron`.
+fn field<'a>(entry: &'a Value, path: &str) -> Option<&'a Value> {
+    path.split('.')
+        .try_fold(entry, |value, key| value.as_object()?.get(key))
+}
+
+/// A one-time run as a schedule, such as "once at 2027-06-01T07:00:00Z". The config
+/// gives the time as Unix milliseconds or as an ISO 8601 date and time with an
+/// offset; text that is neither is kept as written.
+fn one_time(value: &Value) -> Option<String> {
+    let time = match value {
+        Value::Number(number) => Timestamp::from_millisecond(number.as_i64()?).ok()?,
+        Value::String(text) => match text.parse::<Timestamp>() {
+            Ok(time) => time,
+            Err(_) => return Some(format!("once at {text}")),
+        },
+        _ => return None,
+    };
+    Some(format!("once at {time}"))
 }
 
 /// A trust value as text: strings as they are, booleans and numbers written out.
@@ -470,6 +542,89 @@ boundary = false
                 boundary: true,
             }]
         );
+    }
+
+    #[test]
+    fn reads_schedules_without_their_prompts() {
+        let home = tempfile::tempdir().unwrap();
+        let list = home.path().join("tasks.json");
+        fs::write(
+            &list,
+            r#"{
+  "scheduledTasks": [
+    { "id": "digest", "cronExpression": "0 7 * * 1-5", "enabled": true,
+      "cwd": "C:/work", "prompt": "secret-prompt" },
+    { "id": "reminder", "fireAt": 1811833200000, "enabled": false },
+    { "id": "call", "fireAt": "2026-11-02T09:00:00+01:00" },
+    { "cronExpression": "0 * * * *" },
+    "not a task"
+  ]
+}"#,
+        )
+        .unwrap();
+        let keyed = home.path().join("jobs.toml");
+        fs::write(
+            &keyed,
+            "[jobs.backup]\ntrigger = { cron = \"0 2 * * *\" }\nprompt = \"secret-prompt\"\n",
+        )
+        .unwrap();
+        let p = platform();
+        let ctx = context_with(
+            home.path(),
+            &format!(
+                r#"
+[[schedules.{p}]]
+file = "~/tasks.json"
+select = "scheduledTasks.*"
+name = "id"
+schedule = ["cronExpression"]
+at = "fireAt"
+folder = "cwd"
+enabled = "enabled"
+
+[[schedules.{p}]]
+file = "~/jobs.toml"
+select = "jobs.*"
+schedule = ["trigger.cron"]
+"#
+            ),
+        );
+
+        let records = Configs.collect(&ctx).unwrap();
+
+        let schedule = |file: &PathBuf,
+                        name: &str,
+                        schedule: &str,
+                        folder: Option<&str>,
+                        enabled: Option<bool>| Fact::ToolSchedule {
+            tool: "test-tool".into(),
+            file: file.clone(),
+            name: name.into(),
+            schedule: Some(schedule.into()),
+            folder: folder.map(str::to_owned),
+            enabled,
+        };
+        assert_eq!(
+            facts(&records),
+            [
+                &schedule(&list, "digest", "0 7 * * 1-5", Some("C:/work"), Some(true)),
+                &schedule(
+                    &list,
+                    "reminder",
+                    "once at 2027-06-01T07:00:00Z",
+                    None,
+                    Some(false)
+                ),
+                &schedule(&list, "call", "once at 2026-11-02T08:00:00Z", None, None),
+                &schedule(&keyed, "backup", "0 2 * * *", None, None),
+            ]
+        );
+        assert!(
+            records
+                .iter()
+                .all(|record| record.evidence == Evidence::Declared)
+        );
+        assert_no_secrets(&records);
     }
 
     #[test]

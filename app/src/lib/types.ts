@@ -23,7 +23,35 @@ export type Fact =
       command: string | null;
       origin: string | null;
       env_names: string[];
+    }
+  | {
+      kind: "scheduled_task";
+      tool: string | null;
+      path: string;
+      enabled: boolean;
+      author: string | null;
+      run_as: string | null;
+      actions: TaskAction[];
+      triggers: string[];
+      last_run: string | null;
+      next_run: string | null;
+    }
+  | {
+      kind: "tool_schedule";
+      tool: string;
+      file: string;
+      name: string;
+      schedule: string | null;
+      folder: string | null;
+      enabled: boolean | null;
     };
+
+/** What a scheduled task starts. Arguments are never kept. */
+export interface TaskAction {
+  program: string;
+  folder: string | null;
+  has_arguments: boolean;
+}
 
 /** One fact with the fields every record carries. */
 export interface FactRecord {
@@ -48,6 +76,8 @@ export interface Totals {
   running: number;
   folders: number;
   servers: number;
+  schedules: number;
+  tasks: number;
 }
 
 export type Status = "running" | "installed" | "config_only";
@@ -62,11 +92,12 @@ export interface ToolView {
   running: FactRecord[];
   folders: FactRecord[];
   servers: FactRecord[];
+  schedules: FactRecord[];
 }
 
 export interface ChangeLine {
   severity: "alert" | "info";
-  tool: string;
+  tool: string | null;
   what: string;
   detail: string;
 }
@@ -82,5 +113,6 @@ export interface ScanView {
   totals: Totals;
   tools: ToolView[];
   not_found: string[];
+  tasks: FactRecord[];
   changes: ChangesView | null;
 }

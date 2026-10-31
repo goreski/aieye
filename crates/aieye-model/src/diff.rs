@@ -2,10 +2,13 @@
 //!
 //! The rules are fixed and deterministic:
 //!
-//! - **Alert:** a tool that was not in the older snapshot; a configured folder or MCP
-//!   server that was added or changed.
-//! - **Info:** everything else, such as anything removed, an install trace found or
-//!   gone, or a tool running from a new executable.
+//! - **Alert:** a tool that was not in the older snapshot; a configured folder, MCP
+//!   server, scheduled task or tool schedule that was added; a configured folder or MCP
+//!   server that changed; a scheduled task or tool schedule that now runs something
+//!   else, at other times, as another account or in another folder, or that was
+//!   switched on.
+//! - **Info:** everything else, such as anything removed, a schedule switched off, an
+//!   install trace found or gone, or a tool running from a new executable.
 //!
 //! A change carries the records behind it, so it keeps their evidence labels.
 
@@ -17,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use crate::{Fact, Record};
 
 /// What makes two facts from different scans the same thing. Facts with the same key
-/// are compared field by field; a running process's PID is ignored.
+/// are compared field by field; a running process's PID and a scheduled task's run
+/// times are ignored.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FactKey {
@@ -40,16 +44,26 @@ pub enum FactKey {
         scope: Option<String>,
         name: String,
     },
+    ScheduledTask {
+        path: String,
+    },
+    ToolSchedule {
+        tool: String,
+        file: PathBuf,
+        name: String,
+    },
 }
 
 impl Fact {
-    /// The AI tool the fact is about.
-    pub fn tool(&self) -> &str {
+    /// The AI tool the fact is about. Only a scheduled task can belong to none.
+    pub fn tool(&self) -> Option<&str> {
         match self {
             Self::ToolPresent { tool, .. }
             | Self::ToolRunning { tool, .. }
             | Self::ConfiguredFolder { tool, .. }
-            | Self::McpServer { tool, .. } => tool,
+            | Self::McpServer { tool, .. }
+            | Self::ToolSchedule { tool, .. } => Some(tool),
+            Self::ScheduledTask { tool, .. } => tool.as_deref(),
         }
     }
 
@@ -73,6 +87,10 @@ impl Fact {
                 scope,
                 name,
             },
+            Self::ScheduledTask { path, .. } => FactKey::ScheduledTask { path },
+            Self::ToolSchedule {
+                tool, file, name, ..
+            } => FactKey::ToolSchedule { tool, file, name },
         }
     }
 
@@ -80,9 +98,73 @@ impl Fact {
     fn differs_from(&self, newer: &Fact) -> bool {
         match (self, newer) {
             (Self::ToolRunning { .. }, Self::ToolRunning { .. }) => false,
+            (Self::ScheduledTask { .. }, Self::ScheduledTask { .. }) => {
+                without_run_times(self) != without_run_times(newer)
+            }
             _ => self != newer,
         }
     }
+
+    /// Whether `newer`, a changed version of this fact, gives AI tools more: for a
+    /// schedule, something else to run, other times or another account or folder to
+    /// run in, or a switch from off to on.
+    fn widens_to(&self, newer: &Fact) -> bool {
+        match (self, newer) {
+            (Self::ConfiguredFolder { .. }, _) | (Self::McpServer { .. }, _) => true,
+            (
+                Self::ScheduledTask {
+                    enabled: old_enabled,
+                    run_as: old_run_as,
+                    actions: old_actions,
+                    triggers: old_triggers,
+                    ..
+                },
+                Self::ScheduledTask {
+                    enabled,
+                    run_as,
+                    actions,
+                    triggers,
+                    ..
+                },
+            ) => {
+                old_actions != actions
+                    || old_triggers != triggers
+                    || old_run_as != run_as
+                    || (!old_enabled && *enabled)
+            }
+            (
+                Self::ToolSchedule {
+                    schedule: old_schedule,
+                    folder: old_folder,
+                    enabled: old_enabled,
+                    ..
+                },
+                Self::ToolSchedule {
+                    schedule,
+                    folder,
+                    enabled,
+                    ..
+                },
+            ) => {
+                old_schedule != schedule
+                    || old_folder != folder
+                    || (*old_enabled != Some(true) && *enabled == Some(true))
+            }
+            _ => false,
+        }
+    }
+}
+
+fn without_run_times(fact: &Fact) -> Fact {
+    let mut fact = fact.clone();
+    if let Fact::ScheduledTask {
+        last_run, next_run, ..
+    } = &mut fact
+    {
+        *last_run = None;
+        *next_run = None;
+    }
+    fact
 }
 
 /// How much a change matters.
@@ -108,7 +190,8 @@ pub enum ChangeKind {
 pub struct Change {
     pub severity: Severity,
     pub kind: ChangeKind,
-    pub tool: String,
+    /// The AI tool the fact is about, if any.
+    pub tool: Option<String>,
     /// The record in the older snapshot, unless the fact was added.
     pub before: Option<Record>,
     /// The record in the newer snapshot, unless the fact was removed.
@@ -200,22 +283,32 @@ fn by_key(records: &[Record]) -> BTreeMap<FactKey, &Record> {
 fn tools(records: &[Record]) -> BTreeSet<String> {
     records
         .iter()
-        .map(|record| record.fact.tool().to_owned())
+        .filter_map(|record| record.fact.tool())
+        .map(str::to_owned)
         .collect()
 }
 
 fn change(kind: ChangeKind, before: Option<&Record>, after: Option<&Record>) -> Change {
     let fact = &after.or(before).expect("a change has a record").fact;
-    let widens_access = matches!(fact, Fact::ConfiguredFolder { .. } | Fact::McpServer { .. });
-    let severity = if widens_access && kind != ChangeKind::Removed {
-        Severity::Alert
-    } else {
-        Severity::Info
+    let alert = match (kind, before) {
+        (ChangeKind::Added, _) => matches!(
+            fact,
+            Fact::ConfiguredFolder { .. }
+                | Fact::McpServer { .. }
+                | Fact::ScheduledTask { .. }
+                | Fact::ToolSchedule { .. }
+        ),
+        (ChangeKind::Changed, Some(before)) => before.fact.widens_to(fact),
+        _ => false,
     };
     Change {
-        severity,
+        severity: if alert {
+            Severity::Alert
+        } else {
+            Severity::Info
+        },
         kind,
-        tool: fact.tool().to_owned(),
+        tool: fact.tool().map(str::to_owned),
         before: before.cloned(),
         after: after.cloned(),
     }
@@ -228,7 +321,9 @@ mod tests {
 
     fn record(fact: Fact) -> Record {
         let evidence = match fact {
-            Fact::ConfiguredFolder { .. } | Fact::McpServer { .. } => Evidence::Declared,
+            Fact::ConfiguredFolder { .. } | Fact::McpServer { .. } | Fact::ToolSchedule { .. } => {
+                Evidence::Declared
+            }
             _ => Evidence::Verified,
         };
         Record {
@@ -278,10 +373,42 @@ mod tests {
         })
     }
 
+    fn task(path: &str, enabled: bool, trigger: &str, last_run: &str) -> Record {
+        record(Fact::ScheduledTask {
+            tool: None,
+            path: path.into(),
+            enabled,
+            author: None,
+            run_as: Some("me".into()),
+            actions: vec![crate::TaskAction {
+                program: r"C:\tools\job.exe".into(),
+                folder: None,
+                has_arguments: true,
+            }],
+            triggers: vec![trigger.into()],
+            last_run: Some(last_run.parse().unwrap()),
+            next_run: None,
+        })
+    }
+
+    fn schedule(tool: &str, cron: &str, enabled: bool) -> Record {
+        record(Fact::ToolSchedule {
+            tool: tool.into(),
+            file: "tasks.json".into(),
+            name: "digest".into(),
+            schedule: Some(cron.into()),
+            folder: None,
+            enabled: Some(enabled),
+        })
+    }
+
     fn summary(diff: &Diff) -> Vec<(Severity, ChangeKind, String)> {
         diff.changes
             .iter()
-            .map(|change| (change.severity, change.kind, change.tool.clone()))
+            .map(|change| {
+                let tool = change.tool.clone().unwrap_or_default();
+                (change.severity, change.kind, tool)
+            })
             .collect()
     }
 
@@ -351,6 +478,84 @@ mod tests {
                 (Severity::Info, ChangeKind::Removed, "a".into()),
             ]
         );
+    }
+
+    #[test]
+    fn new_scheduled_tasks_are_alerts_even_without_a_tool() {
+        let added = diff(
+            &[],
+            &[task(
+                r"\Job",
+                true,
+                "daily at 07:38",
+                "2026-10-30T07:38:00Z",
+            )],
+        );
+
+        assert_eq!(
+            summary(&added),
+            [(Severity::Alert, ChangeKind::Added, String::new())]
+        );
+        assert_eq!(added.changes[0].tool, None);
+        assert!(added.new_tools.is_empty());
+    }
+
+    #[test]
+    fn scheduled_tasks_ignore_run_times_and_alert_on_wider_runs() {
+        let before = [task(
+            r"\Job",
+            true,
+            "daily at 07:38",
+            "2026-10-30T07:38:00Z",
+        )];
+        let ran_again = [task(
+            r"\Job",
+            true,
+            "daily at 07:38",
+            "2026-10-31T07:38:00Z",
+        )];
+        assert!(diff(&before, &ran_again).is_empty());
+
+        let more_often = [task(r"\Job", true, "every 1 h", "2026-10-30T07:38:00Z")];
+        let switched_off = [task(
+            r"\Job",
+            false,
+            "daily at 07:38",
+            "2026-10-30T07:38:00Z",
+        )];
+        use ChangeKind::*;
+        use Severity::*;
+        assert_eq!(
+            summary(&diff(&before, &more_often)),
+            [(Alert, Changed, String::new())]
+        );
+        assert_eq!(
+            summary(&diff(&before, &switched_off)),
+            [(Info, Changed, String::new())]
+        );
+        assert_eq!(
+            summary(&diff(&switched_off, &before)),
+            [(Alert, Changed, String::new())]
+        );
+        assert_eq!(
+            summary(&diff(&before, &[])),
+            [(Info, Removed, String::new())]
+        );
+    }
+
+    #[test]
+    fn tool_schedules_alert_when_added_rescheduled_or_switched_on() {
+        let daily = [schedule("a", "0 7 * * *", true)];
+        let hourly = [schedule("a", "0 * * * *", true)];
+        let off = [schedule("a", "0 7 * * *", false)];
+
+        use ChangeKind::*;
+        use Severity::*;
+        let a = || "a".to_owned();
+        assert_eq!(summary(&diff(&[], &daily)), [(Alert, Added, a())]);
+        assert_eq!(summary(&diff(&daily, &hourly)), [(Alert, Changed, a())]);
+        assert_eq!(summary(&diff(&daily, &off)), [(Info, Changed, a())]);
+        assert_eq!(summary(&diff(&off, &daily)), [(Alert, Changed, a())]);
     }
 
     #[test]
