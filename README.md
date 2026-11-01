@@ -66,7 +66,7 @@ Every fact carries one of three evidence labels:
 
 AIEye is in early development and runs on Windows 11 for now; Windows 10 should work but is not tested yet.
 
-Download `AIEye_<version>_x64-setup.exe` from the [latest release](https://github.com/goreski/aieye/releases/latest) and run it. It installs for your account only and needs no administrator rights. The `.msi` in the same release installs for every user of the machine and needs administrator rights.
+Download `AIEye_<version>_x64-setup.exe` from the newest release on the [Releases page](https://github.com/goreski/aieye/releases) and run it. It installs for your account only and needs no administrator rights. The `.msi` in the same release installs for every user of the machine and needs administrator rights.
 
 - **The installers are not code-signed yet.** Windows SmartScreen warns about an unknown publisher; choose **More info**, then **Run anyway**. Signing comes in a later release.
 - **Check the download** against `SHA256SUMS.txt` from the same release. In PowerShell, `Get-FileHash .\AIEye_0.1.0_x64-setup.exe` prints the hash to compare.
