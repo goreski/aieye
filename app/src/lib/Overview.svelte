@@ -94,6 +94,10 @@
     gap: 12px;
   }
 
+  th {
+    white-space: nowrap;
+  }
+
   tr.off td {
     color: var(--muted);
   }

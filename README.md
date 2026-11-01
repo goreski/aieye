@@ -30,7 +30,11 @@ AIEye works like antivirus, with two parts:
 
 ## What a scan looks like
 
-On the development machine, one `aieye scan` finds 6 AI tools: 26 install traces, 12 AI processes running right now, 11 folders and 2 MCP servers named in their configs, and 13 scheduled tasks to check for AI. Every finding is a record like this one:
+The desktop app shows the latest scan, what changed since the one before, and every AI tool it found:
+
+<img alt="The AIEye window: totals of AI tools, running AI processes, configured folders, MCP servers and AI schedules, a list of changes since the last scan, and a card for each AI tool found." src="docs/images/app-overview.png" width="700">
+
+On the development machine, one scan finds 6 AI tools: 26 install traces, 12 AI processes running right now, 11 folders and 2 MCP servers named in their configs, and 13 scheduled tasks to check for AI. Every finding is a record like this one:
 
 ```json
 {
@@ -58,9 +62,19 @@ Every fact carries one of three evidence labels:
 | `declared` | A tool's own config or a vendor's own list | Trusted-folder files, MCP config |
 | `inferred` | Produced by AIEye's deterministic rules | Recurring-pattern detection |
 
-## Quick start
+## Install
 
-AIEye is in early development and runs on Windows for now. You need Rust (stable) and the Visual Studio C++ Build Tools.
+AIEye is in early development and runs on Windows 11 for now; Windows 10 should work but is not tested yet.
+
+Download `AIEye_<version>_x64-setup.exe` from the [latest release](https://github.com/goreski/aieye/releases/latest) and run it. It installs for your account only and needs no administrator rights. The `.msi` in the same release installs for every user of the machine and needs administrator rights.
+
+- **The installers are not code-signed yet.** Windows SmartScreen warns about an unknown publisher; choose **More info**, then **Run anyway**. Signing comes in a later release.
+- **Check the download** against `SHA256SUMS.txt` from the same release. In PowerShell, `Get-FileHash .\AIEye_0.1.0_x64-setup.exe` prints the hash to compare.
+- **The installer contains the desktop app** with its definitions. The `aieye` command line is not in it yet; build it from source as below.
+
+## Build from source
+
+You need Rust (stable) and the Visual Studio C++ Build Tools.
 
 ```sh
 git clone https://github.com/goreski/aieye
@@ -81,7 +95,7 @@ A scan is read-only. It runs as you and installs nothing. It checks which files 
 
 ### Desktop app
 
-The app shows the latest scan, what changed since the one before, and each tool's processes, install traces, folders and MCP servers with their evidence labels. It shares its data with the command line and opens no network port. You also need Node.js 22 or later.
+The app shows the latest scan, what changed since the one before, each tool's processes, install traces, folders, MCP servers and schedules with their evidence labels, and every scheduled task on the device. It shares its data with the command line and opens no network port. To build it, you also need Node.js 22 or later.
 
 ```sh
 cd app
