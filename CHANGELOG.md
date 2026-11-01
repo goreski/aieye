@@ -2,7 +2,7 @@
 
 All notable changes to AIEye. Versions follow [semantic versioning](https://semver.org/); before 1.0, a minor version may change the definitions format or the data AIEye stores.
 
-## 0.1.0 (not yet released)
+## 0.1.0 (2026-11-01)
 
 The first release: an inventory of what AI tools can reach on a Windows computer, and what changed since the last look.
 
